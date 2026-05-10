@@ -30,7 +30,7 @@ fn main() {
         "https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4={}",
         args.adm4
     );
-    let cachefile = format!("/tmp/cuacabar-{}.json", args.adm4);
+    let cachefile = format!("/tmp/cuaca-{}.json", args.adm4);
 
     let mut iterations = 0;
     let threshold = 20;

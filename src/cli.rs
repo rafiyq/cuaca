@@ -4,7 +4,7 @@ use crate::lang::Lang;
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "cuacabar",
+    name = "cuaca",
     version,
     about = "A weather indicator for Waybar using BMKG weather data",
     long_about = None

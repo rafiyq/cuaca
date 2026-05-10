@@ -1,5 +1,5 @@
 <h1 align="center">
-cuacabar
+cuaca
 </h1>
 
 <p align="center">
@@ -9,7 +9,7 @@ a weather indicator for <a href="https://github.com/Alexays/Waybar/">Waybar</a> 
 
 ## Installation
 
-Compile yourself using `cargo build --release`, or download a precompiled binary from the [releases](https://github.com/bjesus/cuacabar/releases) page.
+Compile yourself using `cargo build --release`, or download a precompiled binary from the [releases](https://github.com/bjesus/cuaca/releases) page.
 
 ## Usage
 
@@ -24,19 +24,19 @@ Compile yourself using `cargo build --release`, or download a precompiled binary
 Example:
 
 ```
-cuacabar --adm4 31.71.03.1001 --ampm --hide-details
+cuaca --adm4 31.71.03.1001 --ampm --hide-details
 ```
 
 ## Waybar configuration
 
-Assuming `cuacabar` is in your path:
+Assuming `cuaca` is in your path:
 
 ```json
 "custom/weather": {
     "format": "{}°",
     "tooltip": true,
     "interval": 3600,
-    "exec": "cuacabar --adm4 31.71.03.1001",
+    "exec": "cuaca --adm4 31.71.03.1001",
     "return-type": "json"
 }
 ```
@@ -51,7 +51,7 @@ Custom styling based on current conditions:
 
 ## How it works
 
-cuacabar fetches 3-day forecast data from BMKG's public weather API for a given administrative area code (adm4). The data includes 3-hourly forecast slots with temperature, humidity, cloud cover, precipitation, wind, and visibility.
+cuaca fetches 3-day forecast data from BMKG's public weather API for a given administrative area code (adm4). The data includes 3-hourly forecast slots with temperature, humidity, cloud cover, precipitation, wind, and visibility.
 
 The first available forecast slot is used as the bar display. The tooltip shows the full 3-day forecast with all available data fields. Results are cached for 10 minutes to avoid excessive API calls.
 
