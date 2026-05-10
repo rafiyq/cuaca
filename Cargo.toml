@@ -1,0 +1,16 @@
+[package]
+name = "cuacabar"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "A weather indicator for Waybar using BMKG weather data"
+
+[dependencies]
+chrono = { version = "0.4.44", features = ["unstable-locales"] }
+clap = { version = "4.6.1", features = ["derive"] }
+reqwest = { version = "0.13.3", default-features = false, features = [
+    "blocking",
+    "json",
+    "rustls",
+] }
+serde_json = "1.0.149"

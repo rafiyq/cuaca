@@ -1,0 +1,18 @@
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: cargo test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Run clippy
+        run: cargo clippy -- -D warnings
+      - name: Check formatting
+        run: cargo fmt --check
+      - name: Run tests
+        run: cargo test
