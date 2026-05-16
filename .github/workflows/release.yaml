@@ -35,9 +35,10 @@ jobs:
       - name: Package artifact
         run: |
           mkdir -p dist
-          tar -czf "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz" \
-            -C target/${{ matrix.target }}/release cuaca \
-            README.md LICENSE
+          cp "target/${{ matrix.target }}/release/cuaca" dist/
+          cp README.md dist/
+          cp LICENSE dist/
+          tar -czf "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz" -C dist .
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -69,9 +70,10 @@ jobs:
       - name: Package artifact
         run: |
           mkdir -p dist
-          tar -czf "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz" \
-            -C target/${{ matrix.target }}/release cuaca \
-            README.md LICENSE
+          cp "target/${{ matrix.target }}/release/cuaca" dist/
+          cp README.md dist/
+          cp LICENSE dist/
+          tar -czf "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz" -C dist .
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -92,7 +94,10 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist
-          Compress-Archive -Path "target\release\cuaca.exe","README.md","LICENSE" -DestinationPath "cuaca-${{ github.ref_name }}-x86_64-windows.zip"
+          Copy-Item "target\release\cuaca.exe" dist/
+          Copy-Item README.md dist/
+          Copy-Item LICENSE dist/
+          Compress-Archive -Path "dist\cuaca.exe","dist\README.md","dist\LICENSE" -DestinationPath "cuaca-${{ github.ref_name }}-x86_64-windows.zip"
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
