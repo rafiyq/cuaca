@@ -26,31 +26,29 @@ pub fn format_temp(temp: i64) -> String {
 }
 
 pub fn format_wind_dir_icon(degrees: i64, nerd: bool) -> &'static str {
-    let dir = ((degrees % 360) as f64 / 45.0).round() as i64 % 8;
+    let dir = ((degrees % 360) as f64 / 45.0).round() as usize % 8;
     if nerd {
-        match dir {
-            0 => "\u{F0340}",
-            1 => "\u{F0347}",
-            2 => "\u{F0343}",
-            3 => "\u{F0349}",
-            4 => "\u{F0341}",
-            5 => "\u{F0348}",
-            6 => "\u{F0342}",
-            7 => "\u{F0346}",
-            _ => "\u{F0340}",
-        }
+        [
+            "\u{F0340}",
+            "\u{F0347}",
+            "\u{F0343}",
+            "\u{F0349}",
+            "\u{F0341}",
+            "\u{F0348}",
+            "\u{F0342}",
+            "\u{F0346}",
+        ][dir]
     } else {
-        match dir {
-            0 => "\u{2b06}\u{fe0f}",
-            1 => "\u{2197}\u{fe0f}",
-            2 => "\u{27a1}\u{fe0f}",
-            3 => "\u{2198}\u{fe0f}",
-            4 => "\u{2b07}\u{fe0f}",
-            5 => "\u{2199}\u{fe0f}",
-            6 => "\u{2b05}\u{fe0f}",
-            7 => "\u{2196}\u{fe0f}",
-            _ => "\u{2b06}\u{fe0f}",
-        }
+        [
+            "\u{2b06}\u{fe0f}",
+            "\u{2197}\u{fe0f}",
+            "\u{27a1}\u{fe0f}",
+            "\u{2198}\u{fe0f}",
+            "\u{2b07}\u{fe0f}",
+            "\u{2199}\u{fe0f}",
+            "\u{2b05}\u{fe0f}",
+            "\u{2196}\u{fe0f}",
+        ][dir]
     }
 }
 
@@ -73,10 +71,6 @@ pub fn get_weather_icon(code: u32, nerd: bool) -> &'static str {
 }
 
 pub fn format_indicator(slot: &serde_json::Value, expression: &str, weather_icon: &str) -> String {
-    if !slot.is_object() {
-        return String::new();
-    }
-
     let map = match slot.as_object() {
         Some(m) => m,
         None => return String::new(),
