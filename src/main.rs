@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs::{metadata, read_to_string, File};
 use std::io::Write;
+use std::path::PathBuf;
 use std::process::exit;
 use std::thread;
 use std::time::{Duration, SystemTime};
@@ -21,6 +22,10 @@ mod constants;
 mod format;
 mod lang;
 
+fn cache_dir() -> PathBuf {
+    std::env::temp_dir()
+}
+
 #[derive(Deserialize)]
 struct GpsCache {
     adm4: String,
@@ -30,7 +35,7 @@ struct GpsCache {
 }
 
 impl GpsCache {
-    fn save(&self, path: &str) {
+    fn save(&self, path: &PathBuf) {
         if let Ok(mut f) = File::create(path) {
             let _ = f.write_all(
                 serde_json::to_string_pretty(&json!({
@@ -54,7 +59,6 @@ impl GpsCache {
 }
 
 fn resolve_adm4(args: &Args) -> String {
-    const GPS_CACHE_FILE: &str = "/tmp/cuaca-gps.json";
     const GPS_CACHE_MAX_AGE_SECS: u64 = 86400;
 
     if let Some(ref code) = args.adm4 {
@@ -62,17 +66,17 @@ fn resolve_adm4(args: &Args) -> String {
     }
 
     if let (Some(lat), Some(lon)) = (args.lat, args.lon) {
-        let cache_valid = read_to_string(GPS_CACHE_FILE)
+        let gps_cache_file = cache_dir().join("cuaca-gps.json");
+        let cache_valid = read_to_string(&gps_cache_file)
             .ok()
             .and_then(|s| serde_json::from_str::<GpsCache>(&s).ok())
-            .map(|c| {
+            .and_then(|c| {
                 if c.lat == lat && c.lon == lon && !c.is_stale(GPS_CACHE_MAX_AGE_SECS) {
                     Some(c.adm4)
                 } else {
                     None
                 }
-            })
-            .flatten();
+            });
 
         if let Some(adm4) = cache_valid {
             return adm4;
@@ -106,7 +110,7 @@ fn resolve_adm4(args: &Args) -> String {
                 lon,
                 epoch_secs: now,
             }
-            .save(GPS_CACHE_FILE);
+            .save(&gps_cache_file);
             return village.code;
         }
 
@@ -158,7 +162,7 @@ fn main() {
         "https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4={}",
         adm4
     );
-    let cachefile = format!("/tmp/cuaca-{}.json", adm4);
+    let cachefile = cache_dir().join(format!("cuaca-{}.json", adm4));
 
     let mut iterations = 0;
     let threshold = 20;
@@ -202,12 +206,12 @@ fn main() {
 
     if !is_cache_file_recent {
         let mut file = File::create(&cachefile).unwrap_or_else(|_| {
-            eprintln!("Unable to create cache file at {}", cachefile);
+            eprintln!("Unable to create cache file at {}", cachefile.display());
             exit(1);
         });
         file.write_all(serde_json::to_string_pretty(&weather).unwrap().as_bytes())
             .unwrap_or_else(|_| {
-                eprintln!("Unable to write cache file at {}", cachefile);
+                eprintln!("Unable to write cache file at {}", cachefile.display());
                 exit(1);
             });
     }
