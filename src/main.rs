@@ -22,8 +22,17 @@ mod constants;
 mod format;
 mod lang;
 
+const CLOUD_COVER_ICON: &str = "\u{2601}\u{fe0f}";
+const PRECIPITATION_ICON: &str = "\u{1f327}\u{fe0f}";
+const VISIBILITY_ICON: &str = "\u{1f441}\u{fe0f}";
+const ERROR_ICON: &str = "\u{26d3}\u{fe0f}";
+
 fn cache_dir() -> PathBuf {
     std::env::temp_dir()
+}
+
+fn error_json(text: &str, tooltip: &str) -> String {
+    format!("{{\"text\":\"{}\", \"tooltip\":\"{}\"}}", text, tooltip)
 }
 
 #[derive(Deserialize)]
@@ -83,19 +92,19 @@ fn resolve_adm4(args: &Args) -> String {
         }
 
         let conn = wilayah::open().unwrap_or_else(|e| {
-            eprintln!(
-                "{{\"text\":\"⛔️\", \"tooltip\":\"failed to open location db: {}\"}}",
-                e
+            println!(
+                "{}",
+                error_json("⛔️", &format!("failed to open location db: {}", e))
             );
-            exit(0)
+            exit(1)
         });
 
         let results = wilayah::find_nearest(&conn, lat, lon, 1).unwrap_or_else(|e| {
-            eprintln!(
-                "{{\"text\":\"⛔️\", \"tooltip\":\"location lookup failed: {}\"}}",
-                e
+            println!(
+                "{}",
+                error_json("⛔️", &format!("location lookup failed: {}", e))
             );
-            exit(0)
+            exit(1)
         });
 
         let now = SystemTime::now()
@@ -114,40 +123,43 @@ fn resolve_adm4(args: &Args) -> String {
             return village.code;
         }
 
-        eprintln!("{{\"text\":\"⛔️\", \"tooltip\":\"no village found for coordinates\"}}");
-        exit(0)
+        println!("{}", error_json("⛔️", "no village found for coordinates"));
+        exit(1)
     }
 
     if let Some(ref name) = args.name {
         let conn = wilayah::open().unwrap_or_else(|e| {
-            eprintln!(
-                "{{\"text\":\"⛔️\", \"tooltip\":\"failed to open location db: {}\"}}",
-                e
+            println!(
+                "{}",
+                error_json("⛔️", &format!("failed to open location db: {}", e))
             );
-            exit(0)
+            exit(1)
         });
 
         let results = wilayah::find_by_name(&conn, name, 10).unwrap_or_else(|e| {
-            eprintln!(
-                "{{\"text\":\"⛔️\", \"tooltip\":\"name lookup failed: {}\"}}",
-                e
+            println!(
+                "{}",
+                error_json("⛔️", &format!("name lookup failed: {}", e))
             );
-            exit(0)
+            exit(1)
         });
 
         if results.is_empty() {
-            eprintln!(
-                "{{\"text\":\"⛔️\", \"tooltip\":\"no village found matching '{}'\"}}",
-                name
+            println!(
+                "{}",
+                error_json("⛔️", &format!("no village found matching '{}'", name))
             );
-            exit(0)
+            exit(1)
         }
 
         return results[0].code.clone();
     }
 
-    eprintln!("{{\"text\":\"⛔️\", \"tooltip\":\"provide --adm4, --lat/--lon, or --name\"}}");
-    exit(0)
+    println!(
+        "{}",
+        error_json("⛔️", "provide --adm4, --lat/--lon, or --name")
+    );
+    exit(1)
 }
 
 fn main() {
@@ -175,46 +187,46 @@ fn main() {
 
     let client = Client::new();
     let weather = if is_cache_file_recent {
-        let json_str = read_to_string(&cachefile).unwrap();
-        serde_json::from_str::<Value>(&json_str).unwrap()
-    } else {
-        loop {
-            match client.get(&weather_url).send() {
-                Ok(response) => match response.json::<Value>() {
-                    Ok(json) => break json,
-                    Err(_) => {
-                        println!(
-                            "{{\"text\":\"\u{26d3}\u{fe0f}\", \"tooltip\":\"invalid BMKG response\"}}"
-                        );
-                        exit(0)
-                    }
-                },
+        match read_to_string(&cachefile) {
+            Ok(json_str) => match serde_json::from_str::<Value>(&json_str) {
+                Ok(json) => json,
                 Err(_) => {
-                    iterations += 1;
-                    thread::sleep(Duration::from_millis(500 * iterations));
-
-                    if iterations == threshold {
-                        println!(
-                            "{{\"text\":\"\u{26d3}\u{fe0f}\", \"tooltip\":\"cannot access BMKG API\"}}"
-                        );
-                        exit(0)
-                    }
+                    println!(
+                        "{}",
+                        error_json(ERROR_ICON, "corrupted cache, fetching fresh data")
+                    );
+                    fetch_weather(
+                        &client,
+                        &weather_url,
+                        &cachefile,
+                        &mut iterations,
+                        threshold,
+                    )
                 }
+            },
+            Err(_) => {
+                println!(
+                    "{}",
+                    error_json(ERROR_ICON, "cache read error, fetching fresh data")
+                );
+                fetch_weather(
+                    &client,
+                    &weather_url,
+                    &cachefile,
+                    &mut iterations,
+                    threshold,
+                )
             }
         }
+    } else {
+        fetch_weather(
+            &client,
+            &weather_url,
+            &cachefile,
+            &mut iterations,
+            threshold,
+        )
     };
-
-    if !is_cache_file_recent {
-        let mut file = File::create(&cachefile).unwrap_or_else(|_| {
-            eprintln!("Unable to create cache file at {}", cachefile.display());
-            exit(1);
-        });
-        file.write_all(serde_json::to_string_pretty(&weather).unwrap().as_bytes())
-            .unwrap_or_else(|_| {
-                eprintln!("Unable to write cache file at {}", cachefile.display());
-                exit(1);
-            });
-    }
 
     let lokasi = &weather["lokasi"];
     let cuaca_groups = match weather["data"]
@@ -224,10 +236,8 @@ fn main() {
     {
         Some(groups) => groups,
         None => {
-            println!(
-                "{{\"text\":\"\u{26d3}\u{fe0f}\", \"tooltip\":\"invalid BMKG data structure\"}}"
-            );
-            exit(0);
+            println!("{}", error_json(ERROR_ICON, "invalid BMKG data structure"));
+            exit(1);
         }
     };
 
@@ -241,8 +251,8 @@ fn main() {
         .collect();
 
     if all_slots.is_empty() {
-        println!("{{\"text\":\"\u{26d3}\u{fe0f}\", \"tooltip\":\"no forecast data available\"}}");
-        exit(0);
+        println!("{}", error_json(ERROR_ICON, "no forecast data available"));
+        exit(1);
     }
 
     let first_slot = all_slots[0];
@@ -325,7 +335,7 @@ fn main() {
 
     let mut current_group: Option<usize> = None;
     for (slot, group_idx) in &all_flat_slots {
-        if *group_idx != current_group.unwrap_or(999) {
+        if current_group.is_none() || current_group != Some(*group_idx) {
             tooltip += "\n<b>";
             current_group = Some(*group_idx);
 
@@ -342,6 +352,8 @@ fn main() {
                     tooltip += &format!("{}, ", lang.today());
                 } else if *group_idx == 1 {
                     tooltip += &format!("{}, ", lang.tomorrow());
+                } else if *group_idx == 2 {
+                    tooltip += &format!("{}, ", lang.day_after_tomorrow());
                 }
 
                 tooltip += &format!(
@@ -372,9 +384,15 @@ fn main() {
             let tp_val = slot["tp"].as_f64().unwrap_or(0.0);
             let vs_val = slot["vs_text"].as_str().unwrap_or("?");
 
+            let (cloud_icon, rain_icon, eye_icon) = if args.nerd {
+                ("\u{F0330}", "\u{F0317}", "\u{F02FD}")
+            } else {
+                (CLOUD_COVER_ICON, PRECIPITATION_ICON, VISIBILITY_ICON)
+            };
+
             line += &format!(
-                "  \u{2601}\u{fe0f} {}%  \u{1f327}\u{fe0f} {} mm  \u{1f441}\u{fe0f} {}",
-                tcc_val, tp_val, vs_val
+                "  {} {}%  {} {} mm  {} {}",
+                cloud_icon, tcc_val, rain_icon, tp_val, eye_icon, vs_val
             );
         }
 
@@ -398,4 +416,48 @@ fn main() {
 
     let json_data = json!(data);
     println!("{}", json_data);
+}
+
+fn fetch_weather(
+    client: &Client,
+    weather_url: &str,
+    cachefile: &PathBuf,
+    iterations: &mut usize,
+    threshold: usize,
+) -> Value {
+    loop {
+        match client.get(weather_url).send() {
+            Ok(response) => match response.json::<Value>() {
+                Ok(json) => {
+                    save_cache(cachefile, &json);
+                    break json;
+                }
+                Err(_) => {
+                    println!("{}", error_json(ERROR_ICON, "invalid BMKG response"));
+                    exit(1)
+                }
+            },
+            Err(_) => {
+                *iterations += 1;
+                thread::sleep(Duration::from_millis(500 * *iterations as u64));
+
+                if *iterations == threshold {
+                    println!("{}", error_json(ERROR_ICON, "cannot access BMKG API"));
+                    exit(1)
+                }
+            }
+        }
+    }
+}
+
+fn save_cache(cachefile: &PathBuf, weather: &Value) {
+    let mut file = File::create(cachefile).unwrap_or_else(|_| {
+        eprintln!("Unable to create cache file at {}", cachefile.display());
+        exit(1);
+    });
+    file.write_all(serde_json::to_string_pretty(&weather).unwrap().as_bytes())
+        .unwrap_or_else(|_| {
+            eprintln!("Unable to write cache file at {}", cachefile.display());
+            exit(1);
+        });
 }
