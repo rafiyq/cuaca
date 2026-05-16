@@ -19,6 +19,10 @@ jobs:
             name: aarch64-linux
     steps:
       - uses: actions/checkout@v4
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: ${{ matrix.target }}
       - name: Install cross
         if: matrix.name == 'aarch64-linux'
         run: cargo install cross
@@ -28,13 +32,9 @@ jobs:
           targets: ${{ matrix.target }}
       - name: Build (release)
         if: matrix.name == 'x86_64-linux'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: cargo build --release --target ${{ matrix.target }}
       - name: Build (release, cross)
         if: matrix.name == 'aarch64-linux'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: cross build --release --target ${{ matrix.target }}
       - name: Package artifact
         run: |
@@ -65,13 +65,15 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: ${{ matrix.target }}
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
       - name: Build (release)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: cargo build --release --target ${{ matrix.target }}
       - name: Package artifact
         run: |
@@ -92,11 +94,11 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Build (release)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: cargo build --release
       - name: Package artifact
         shell: pwsh
