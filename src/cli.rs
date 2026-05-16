@@ -14,7 +14,16 @@ pub struct Args {
         long,
         help = "BMKG adm4 code for the desired location (e.g. 31.71.03.1001)"
     )]
-    pub adm4: String,
+    pub adm4: Option<String>,
+
+    #[arg(long, help = "Latitude for GPS-based location")]
+    pub lat: Option<f64>,
+
+    #[arg(long, help = "Longitude for GPS-based location")]
+    pub lon: Option<f64>,
+
+    #[arg(long, help = "Village name to look up")]
+    pub name: Option<String>,
 
     #[arg(
         value_enum,

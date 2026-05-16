@@ -8,6 +8,7 @@ use std::time::{Duration, SystemTime};
 use chrono::{Locale, NaiveDateTime};
 use clap::Parser;
 use reqwest::blocking::Client;
+use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::cli::Args;
@@ -20,17 +21,144 @@ mod constants;
 mod format;
 mod lang;
 
+#[derive(Deserialize)]
+struct GpsCache {
+    adm4: String,
+    lat: f64,
+    lon: f64,
+    epoch_secs: u64,
+}
+
+impl GpsCache {
+    fn save(&self, path: &str) {
+        if let Ok(mut f) = File::create(path) {
+            let _ = f.write_all(
+                serde_json::to_string_pretty(&json!({
+                    "adm4": self.adm4,
+                    "lat": self.lat,
+                    "lon": self.lon,
+                    "epoch_secs": self.epoch_secs
+                }))
+                .unwrap()
+                .as_bytes(),
+            );
+        }
+    }
+
+    fn is_stale(&self, max_age_secs: u64) -> bool {
+        SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map(|d| d.as_secs() > self.epoch_secs + max_age_secs)
+            .unwrap_or(true)
+    }
+}
+
+fn resolve_adm4(args: &Args) -> String {
+    const GPS_CACHE_FILE: &str = "/tmp/cuaca-gps.json";
+    const GPS_CACHE_MAX_AGE_SECS: u64 = 86400;
+
+    if let Some(ref code) = args.adm4 {
+        return code.clone();
+    }
+
+    if let (Some(lat), Some(lon)) = (args.lat, args.lon) {
+        let cache_valid = read_to_string(GPS_CACHE_FILE)
+            .ok()
+            .and_then(|s| serde_json::from_str::<GpsCache>(&s).ok())
+            .map(|c| {
+                if c.lat == lat && c.lon == lon && !c.is_stale(GPS_CACHE_MAX_AGE_SECS) {
+                    Some(c.adm4)
+                } else {
+                    None
+                }
+            })
+            .flatten();
+
+        if let Some(adm4) = cache_valid {
+            return adm4;
+        }
+
+        let conn = wilayah::open().unwrap_or_else(|e| {
+            eprintln!(
+                "{{\"text\":\"⛔️\", \"tooltip\":\"failed to open location db: {}\"}}",
+                e
+            );
+            exit(0)
+        });
+
+        let results = wilayah::find_nearest(&conn, lat, lon, 1).unwrap_or_else(|e| {
+            eprintln!(
+                "{{\"text\":\"⛔️\", \"tooltip\":\"location lookup failed: {}\"}}",
+                e
+            );
+            exit(0)
+        });
+
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        if let Some(village) = results.into_iter().next() {
+            GpsCache {
+                adm4: village.code.clone(),
+                lat,
+                lon,
+                epoch_secs: now,
+            }
+            .save(GPS_CACHE_FILE);
+            return village.code;
+        }
+
+        eprintln!("{{\"text\":\"⛔️\", \"tooltip\":\"no village found for coordinates\"}}");
+        exit(0)
+    }
+
+    if let Some(ref name) = args.name {
+        let conn = wilayah::open().unwrap_or_else(|e| {
+            eprintln!(
+                "{{\"text\":\"⛔️\", \"tooltip\":\"failed to open location db: {}\"}}",
+                e
+            );
+            exit(0)
+        });
+
+        let results = wilayah::find_by_name(&conn, name, 10).unwrap_or_else(|e| {
+            eprintln!(
+                "{{\"text\":\"⛔️\", \"tooltip\":\"name lookup failed: {}\"}}",
+                e
+            );
+            exit(0)
+        });
+
+        if results.is_empty() {
+            eprintln!(
+                "{{\"text\":\"⛔️\", \"tooltip\":\"no village found matching '{}'\"}}",
+                name
+            );
+            exit(0)
+        }
+
+        return results[0].code.clone();
+    }
+
+    eprintln!("{{\"text\":\"⛔️\", \"tooltip\":\"provide --adm4, --lat/--lon, or --name\"}}");
+    exit(0)
+}
+
 fn main() {
     let args = Args::parse();
     let lang = args.lang;
+
+    let adm4 = resolve_adm4(&args);
 
     let mut data = HashMap::new();
 
     let weather_url = format!(
         "https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4={}",
-        args.adm4
+        adm4
     );
-    let cachefile = format!("/tmp/cuaca-{}.json", args.adm4);
+    let cachefile = format!("/tmp/cuaca-{}.json", adm4);
 
     let mut iterations = 0;
     let threshold = 20;

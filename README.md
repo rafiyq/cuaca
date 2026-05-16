@@ -1,11 +1,6 @@
-<h1 align="center">
-cuaca
-</h1>
+# cuaca
 
-<p align="center">
-a weather indicator for <a href="https://github.com/Alexays/Waybar/">Waybar</a> using <a href="https://www.bmkg.go.id/">BMKG</a> weather data.
-</p>
-<hr />
+a weather indicator for [Waybar](https://github.com/Alexays/Waybar/) using [BMKG](https://www.bmkg.go.id/) weather data.
 
 ## Installation
 
@@ -60,3 +55,4 @@ The first available forecast slot is used as the bar display. The tooltip shows 
 Weather data is provided by [BMKG](https://www.bmkg.go.id/) (Badan Meteorologi, Klimatologi, dan Geofisika) through their [public forecast API](https://data.bmkg.go.id/prakiraan-cuaca/). Attribution is included in the tooltip.
 
 Administrative area codes (adm4) follow Keputusan Menteri Dalam Negeri Nomor 100.1.1-6117 Tahun 2022. See [BMKG's data portal](https://data.bmkg.go.id/prakiraan-cuaca/) and [GitHub repository](https://github.com/infoBMKG/data-cuaca) for more information.
+
