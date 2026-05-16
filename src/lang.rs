@@ -72,6 +72,13 @@ impl Lang {
         }
     }
 
+    pub fn day_after_tomorrow(&self) -> &'static str {
+        match self {
+            Self::EN => "Day After Tomorrow",
+            Self::ID => "Lusa",
+        }
+    }
+
     pub fn weather_desc_key(&self) -> &'static str {
         match self {
             Self::EN => "weather_desc_en",
