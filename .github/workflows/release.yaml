@@ -1,11 +1,13 @@
 on:
-  release:
-    types: [created]
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch: {}
 
 jobs:
   release:
-    permissions: write-all
+    permissions:
+      contents: write
     name: release ${{ matrix.target }}
     runs-on: ubuntu-latest
     strategy:
@@ -32,11 +34,12 @@ jobs:
         with:
           name: cuaca-${{ matrix.target }}
           path: dist/*
-      - name: Attach to GitHub Release
-        if: ${{ github.event_name == 'release' }}
+      - name: Create GitHub Release
+        if: ${{ github.event_name == 'push' }}
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/cuaca
             dist/README.md
             dist/LICENSE
+          generate_release_notes: true
