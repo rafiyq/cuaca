@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT"
 description = "A weather indicator for Waybar using BMKG weather data"
+repository = "https://github.com/rafiyq/cuaca"
+homepage = "https://github.com/rafiyq/cuaca"
 
 [dependencies]
 chrono = { version = "0.4.44", features = ["unstable-locales"] }
