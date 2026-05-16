@@ -16,10 +16,10 @@ pub struct Args {
     )]
     pub adm4: Option<String>,
 
-    #[arg(long, help = "Latitude for GPS-based location")]
+    #[arg(long, help = "Latitude for GPS-based location (requires --lon)")]
     pub lat: Option<f64>,
 
-    #[arg(long, help = "Longitude for GPS-based location")]
+    #[arg(long, help = "Longitude for GPS-based location (requires --lat)")]
     pub lon: Option<f64>,
 
     #[arg(long, help = "Village name to look up")]

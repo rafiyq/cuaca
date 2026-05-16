@@ -74,6 +74,15 @@ fn resolve_adm4(args: &Args) -> String {
         return code.clone();
     }
 
+    if args.lat.is_some() && args.lon.is_none() {
+        println!("{}", error_json("⛔️", "--lat requires --lon"));
+        exit(1);
+    }
+    if args.lon.is_some() && args.lat.is_none() {
+        println!("{}", error_json("⛔️", "--lon requires --lat"));
+        exit(1);
+    }
+
     if let (Some(lat), Some(lon)) = (args.lat, args.lon) {
         let gps_cache_file = cache_dir().join("cuaca-gps.json");
         let cache_valid = read_to_string(&gps_cache_file)
