@@ -25,6 +25,10 @@ pub fn format_temp(temp: i64) -> String {
     format!("{: >3}\u{00b0}", temp)
 }
 
+pub fn celsius_to_fahrenheit(celsius: i64) -> i64 {
+    (celsius as f64 * 9.0 / 5.0 + 32.0).round() as i64
+}
+
 pub fn format_wind_dir_icon(degrees: i64, nerd: bool) -> &'static str {
     let dir = ((degrees % 360) as f64 / 45.0).round() as usize % 8;
     if nerd {
@@ -215,5 +219,14 @@ mod tests {
         let slot = json!({"t": 25, "hu": 70});
         let result = format_indicator(&slot, "{t} {hu}%", "\u{2600}\u{fe0f}");
         assert_eq!(result, "25 70%");
+    }
+
+    #[test]
+    fn celsius_to_fahrenheit_conversions() {
+        assert_eq!(celsius_to_fahrenheit(0), 32);
+        assert_eq!(celsius_to_fahrenheit(100), 212);
+        assert_eq!(celsius_to_fahrenheit(-40), -40);
+        assert_eq!(celsius_to_fahrenheit(37), 99);
+        assert_eq!(celsius_to_fahrenheit(20), 68);
     }
 }

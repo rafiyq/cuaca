@@ -14,7 +14,8 @@ use serde_json::{json, Value};
 
 use crate::cli::Args;
 use crate::format::{
-    format_indicator, format_temp, format_time, format_wind_dir_icon, get_weather_icon,
+    celsius_to_fahrenheit, format_indicator, format_temp, format_time, format_wind_dir_icon,
+    get_weather_icon,
 };
 
 mod cli;
@@ -271,7 +272,13 @@ fn main() {
 
     let text = match &args.custom_indicator {
         None => {
-            let indicator = format_temp(first_slot["t"].as_i64().unwrap_or(0));
+            let temp_c = first_slot["t"].as_i64().unwrap_or(0);
+            let temp = if args.fahrenheit {
+                celsius_to_fahrenheit(temp_c)
+            } else {
+                temp_c
+            };
+            let indicator = format_temp(temp);
 
             format!("{} {}", weather_icon, indicator)
         }
@@ -279,10 +286,17 @@ fn main() {
     };
     data.insert("text", text);
 
+    let first_temp = first_slot["t"].as_i64().unwrap_or(0);
+    let display_temp = if args.fahrenheit {
+        celsius_to_fahrenheit(first_temp)
+    } else {
+        first_temp
+    };
+
     let mut tooltip = format!(
         "<b>{}</b> {}\u{00b0}\n",
         first_slot[weather_desc_key].as_str().unwrap_or("?"),
-        first_slot["t"].as_i64().unwrap_or(0),
+        display_temp,
     );
 
     tooltip += &format!(
@@ -378,11 +392,18 @@ fn main() {
         let ws_val = slot["ws"].as_f64().unwrap_or(0.0);
         let wd_val = slot["wd_deg"].as_i64().unwrap_or(0);
 
+        let temp_c = slot["t"].as_i64().unwrap_or(0);
+        let temp = if args.fahrenheit {
+            celsius_to_fahrenheit(temp_c)
+        } else {
+            temp_c
+        };
+
         let mut line = format!(
             "{}  {}  {}  {}  {} {} km/h",
             format_time(local_dt, args.ampm),
             get_weather_icon(slot["weather"].as_u64().unwrap_or(0) as u32, args.nerd),
-            format_temp(slot["t"].as_i64().unwrap_or(0)),
+            format_temp(temp),
             desc,
             format_wind_dir_icon(wd_val, args.nerd),
             ws_val,

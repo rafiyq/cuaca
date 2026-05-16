@@ -58,4 +58,7 @@ pub struct Args {
         help = "Show shorter per-slot lines (hide cloud cover, precipitation, and visibility)"
     )]
     pub hide_details: bool,
+
+    #[arg(long, help = "Display temperature in Fahrenheit instead of Celsius")]
+    pub fahrenheit: bool,
 }
