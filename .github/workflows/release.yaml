@@ -28,9 +28,13 @@ jobs:
           targets: ${{ matrix.target }}
       - name: Build (release)
         if: matrix.name == 'x86_64-linux'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: cargo build --release --target ${{ matrix.target }}
       - name: Build (release, cross)
         if: matrix.name == 'aarch64-linux'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: cross build --release --target ${{ matrix.target }}
       - name: Package artifact
         run: |
@@ -66,6 +70,8 @@ jobs:
         with:
           targets: ${{ matrix.target }}
       - name: Build (release)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: cargo build --release --target ${{ matrix.target }}
       - name: Package artifact
         run: |
@@ -89,6 +95,8 @@ jobs:
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Build (release)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: cargo build --release
       - name: Package artifact
         shell: pwsh
