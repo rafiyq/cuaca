@@ -1,26 +1,24 @@
+use std::collections::{BTreeSet, HashMap};
+
 use chrono::{Locale, NaiveDateTime, Timelike};
 use serde_json::Value;
 
 use crate::constants::get_ascii_icon;
 use crate::format::{celsius_to_fahrenheit, format_temp};
-use crate::lang::Lang;
 
 const VLINE: &str = "│";
 const HLINE: &str = "─";
 const TL: &str = "┌";
-const TR: &str = "┐";
 const BL: &str = "└";
 const BR: &str = "┘";
-const TOP_T: &str = "┬";
-const BOTTOM_T: &str = "┴";
-const CROSS: &str = "┼";
 const LEFT_T: &str = "├";
 const RIGHT_T: &str = "┤";
 
-const CELL_WIDTH: usize = 29;
+const HOUR_COL_WIDTH: usize = 6;
+const DAY_COL_WIDTH: usize = 30;
 const ICON_WIDTH: usize = 13;
-const DATA_WIDTH: usize = CELL_WIDTH - ICON_WIDTH;
-const ICON_COLS: usize = 5;
+const DATA_WIDTH: usize = DAY_COL_WIDTH - ICON_WIDTH;
+const ICON_ROWS: usize = 5;
 
 pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
     let lang = args.lang;
@@ -96,144 +94,115 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
     out.push_str(&format!("                {} mm\n", tp));
 
     let locale = Locale::en_US;
+    let day_labels = [lang.today(), lang.tomorrow(), lang.day_after_tomorrow()];
 
-    for (group_idx, group) in cuaca_groups.iter().enumerate() {
+    let mut all_hours: BTreeSet<String> = BTreeSet::new();
+    let mut day_data: Vec<HashMap<String, &Value>> = Vec::new();
+
+    for group in cuaca_groups.iter() {
         let slots: Vec<&Value> = group.as_array().map_or(vec![], |s| s.iter().collect());
-        if slots.is_empty() || group_idx >= 3 {
-            continue;
-        }
-
-        let ncols = slots.len();
-
-        let date_str = slots
-            .first()
-            .and_then(|s| s["local_datetime"].as_str())
-            .and_then(|dt| NaiveDateTime::parse_from_str(dt, "%Y-%m-%d %H:%M:%S").ok())
-            .map(|dt| dt.date().format_localized("%a %d %b", locale).to_string())
-            .unwrap_or_else(|| "Unknown".to_string());
-
-        let total_width = ncols * CELL_WIDTH + (ncols - 1);
-        let tab_width = date_str.len() + 4;
-        let tab_start = (total_width - tab_width) / 2;
-
-        out.push('\n');
-
-        // Tab top line
-        out.push_str(&" ".repeat(tab_start));
-        out.push_str(TL);
-        out.push_str(&HLINE.repeat(tab_width - 2));
-        out.push_str(TR);
-        out.push('\n');
-
-        // Top border with embedded date tab
-        let mut border: Vec<char> = Vec::with_capacity(total_width + ncols + 1);
-        border.push(TL.chars().next().unwrap());
-        for i in 0..ncols {
-            for _ in 0..CELL_WIDTH {
-                border.push(HLINE.chars().next().unwrap());
-            }
-            if i < ncols - 1 {
-                border.push(TOP_T.chars().next().unwrap());
+        let mut day_map = HashMap::new();
+        for slot in slots {
+            let hour = extract_hour(slot["local_datetime"].as_str());
+            if let Some(ref h) = hour {
+                all_hours.insert(h.clone());
+                day_map.insert(h.clone(), slot);
             }
         }
-        border.push(TR.chars().next().unwrap());
+        day_data.push(day_map);
+    }
 
-        let tab_content = format!("{} {:^w$} {}", RIGHT_T, date_str, LEFT_T, w = tab_width - 2);
-        for (i, c) in tab_content.chars().enumerate() {
-            let idx = tab_start + 1 + i;
-            if idx < border.len() {
-                border[idx] = c;
-            }
-        }
-        for c in &border {
-            out.push(*c);
-        }
-        out.push('\n');
-
-        // Hours header with tab bottom
-        let mut header: Vec<char> = Vec::new();
-        header.push(VLINE.chars().next().unwrap());
-        for slot in slots.iter().take(ncols) {
-            let time_str = slot["local_datetime"]
-                .as_str()
-                .and_then(|s| NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").ok())
-                .map(|dt| format!("{:02}:{:02}", dt.hour(), dt.minute()))
-                .unwrap_or("??:??".to_string());
-            let cell = format!("{:^CELL_WIDTH$}", time_str);
-            for c in cell.chars() {
-                header.push(c);
-            }
-            header.push(VLINE.chars().next().unwrap());
-        }
-
-        let left_h = (tab_width - 3) / 2;
-        let right_h = tab_width - 3 - left_h;
-        let tab_bottom = format!(
-            "{}{}{}{}{}",
-            BL,
-            HLINE.repeat(left_h),
-            BOTTOM_T,
-            HLINE.repeat(right_h),
-            BR
-        );
-        for (i, c) in tab_bottom.chars().enumerate() {
-            let idx = tab_start + 1 + i;
-            if idx < header.len() {
-                header[idx] = c;
-            }
-        }
-        for c in &header {
-            out.push(*c);
-        }
-        out.push('\n');
-
-        // Separator row
-        out.push_str(LEFT_T);
-        for i in 0..ncols {
-            out.push_str(&HLINE.repeat(CELL_WIDTH));
-            if i < ncols - 1 {
-                out.push_str(CROSS);
+    let day_headers: Vec<String> = cuaca_groups
+        .iter()
+        .enumerate()
+        .map(|(i, g)| {
+            let slots: Vec<&Value> = g.as_array().map_or(vec![], |s| s.iter().collect());
+            let date_str = slots
+                .first()
+                .and_then(|s| s["local_datetime"].as_str())
+                .and_then(|dt| NaiveDateTime::parse_from_str(dt, "%Y-%m-%d %H:%M:%S").ok())
+                .map(|dt| dt.date().format_localized("%a %d %b", locale).to_string())
+                .unwrap_or_else(|| "Unknown".to_string());
+            let label = day_labels.get(i).unwrap_or(&"");
+            if !label.is_empty() {
+                format!("{}, {}", label, date_str)
             } else {
-                out.push_str(RIGHT_T);
+                date_str
             }
-        }
-        out.push('\n');
+        })
+        .collect();
 
-        for row_idx in 0..ICON_COLS {
-            out.push_str(VLINE);
-            for slot in slots.iter().take(ncols) {
-                let cell = render_cell_row(slot, row_idx, lang, fahrenheit);
-                out.push_str(&format!("{:<CELL_WIDTH$}{}", cell, VLINE));
+    let num_days = day_headers.len();
+
+    out.push('\n');
+    out.push_str(TL);
+    out.push_str(&" ".repeat(HOUR_COL_WIDTH));
+    for header in &day_headers {
+        out.push_str(VLINE);
+        out.push_str(&format!("{:^DAY_COL_WIDTH$}", header));
+    }
+    out.push_str(VLINE);
+    out.push('\n');
+
+    out.push_str(LEFT_T);
+    out.push_str(&HLINE.repeat(HOUR_COL_WIDTH));
+    for _ in 0..num_days {
+        out.push_str(VLINE);
+        out.push_str(&HLINE.repeat(DAY_COL_WIDTH));
+    }
+    out.push_str(RIGHT_T);
+    out.push('\n');
+
+    let hours: Vec<&String> = all_hours.iter().collect();
+    for (hour_idx, hour) in hours.iter().enumerate() {
+        for row_idx in 0..ICON_ROWS {
+            if row_idx == 0 {
+                out.push_str(VLINE);
+                out.push_str(&format!("{:^HOUR_COL_WIDTH$}", hour));
+            } else {
+                out.push_str(VLINE);
+                out.push_str(&" ".repeat(HOUR_COL_WIDTH));
             }
+            for day_idx in 0..num_days {
+                out.push_str(VLINE);
+                if let Some(slot) = day_data.get(day_idx).and_then(|d| d.get(*hour)) {
+                    let icon = get_ascii_icon(slot["weather"].as_u64().unwrap_or(0) as u32);
+                    let icon_line = icon[row_idx];
+                    let data = get_cell_data(slot, row_idx, lang.weather_desc_key(), fahrenheit);
+                    out.push_str(&format!("{:<ICON_WIDTH$}{:<DATA_WIDTH$}", icon_line, data));
+                } else {
+                    out.push_str(&" ".repeat(DAY_COL_WIDTH));
+                }
+            }
+            out.push_str(VLINE);
             out.push('\n');
         }
 
-        out.push_str(BL);
-        for i in 0..ncols {
-            out.push_str(&HLINE.repeat(CELL_WIDTH));
-            if i < ncols - 1 {
-                out.push_str(BOTTOM_T);
-            } else {
-                out.push_str(BR);
+        if hour_idx < hours.len() - 1 {
+            out.push_str(LEFT_T);
+            out.push_str(&HLINE.repeat(HOUR_COL_WIDTH));
+            for _ in 0..num_days {
+                out.push_str(VLINE);
+                out.push_str(&HLINE.repeat(DAY_COL_WIDTH));
             }
+            out.push_str(RIGHT_T);
+            out.push('\n');
         }
-        out.push('\n');
     }
+
+    out.push_str(BL);
+    out.push_str(&HLINE.repeat(HOUR_COL_WIDTH));
+    for _ in 0..num_days {
+        out.push_str(VLINE);
+        out.push_str(&HLINE.repeat(DAY_COL_WIDTH));
+    }
+    out.push_str(BR);
+    out.push('\n');
 
     out.push('\n');
     out.push_str(&format!("{}\n", lang.source()));
 
     out
-}
-
-fn render_cell_row(slot: &Value, row: usize, lang: Lang, fahrenheit: bool) -> String {
-    let weather_desc_key = lang.weather_desc_key();
-    let icon = get_ascii_icon(slot["weather"].as_u64().unwrap_or(0) as u32);
-    let icon_line = icon[row];
-
-    let data = get_cell_data(slot, row, weather_desc_key, fahrenheit);
-
-    format!("{:<ICON_WIDTH$}{:<DATA_WIDTH$}", icon_line, data)
 }
 
 fn get_cell_data(slot: &Value, row: usize, desc_key: &str, fahrenheit: bool) -> String {
@@ -278,6 +247,12 @@ fn get_cell_data(slot: &Value, row: usize, desc_key: &str, fahrenheit: bool) -> 
         }
         _ => String::new(),
     }
+}
+
+fn extract_hour(local_datetime: Option<&str>) -> Option<String> {
+    local_datetime
+        .and_then(|s| NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").ok())
+        .map(|dt| format!("{:02}:{:02}", dt.hour(), dt.minute()))
 }
 
 fn format_wind_dir_icon(degrees: i64) -> &'static str {
