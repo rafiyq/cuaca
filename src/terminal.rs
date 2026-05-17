@@ -60,45 +60,37 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
         temp_c
     };
 
-    let humidity = first_slot["hu"].as_i64().unwrap_or(0);
     let ws = first_slot["ws"].as_f64().unwrap_or(0.0);
     let wd_deg = first_slot["wd_deg"].as_i64().unwrap_or(0);
     let wd_cardinal = first_slot["wd"].as_str().unwrap_or("?");
-    let tcc = first_slot["tcc"].as_i64().unwrap_or(0);
     let tp = first_slot["tp"].as_f64().unwrap_or(0.0);
     let vs_text = first_slot["vs_text"].as_str().unwrap_or("?");
 
     let mut out = String::new();
 
+    let first_code = first_slot["weather"].as_u64().unwrap_or(0) as u32;
+    let icon = get_ascii_icon(first_code);
+    let feels_like_c = first_slot["t"].as_i64().unwrap_or(0);
+    let feels_like = if fahrenheit {
+        celsius_to_fahrenheit(feels_like_c)
+    } else {
+        feels_like_c
+    };
+
     out.push_str(&format!("Weather report: {}\n", location));
     out.push('\n');
 
+    out.push_str(&format!("                {}\n", desc));
+    out.push_str(&format!("{}  +{}({}) °C\n", icon[0], temp, feels_like));
     out.push_str(&format!(
-        "  {:<16} {}°C  {}: {}%\n",
-        desc,
-        temp,
-        lang.humidity(),
-        humidity
-    ));
-    out.push_str(&format!(
-        "                  {}: {} {} {} km/h\n",
-        lang.wind(),
+        "{}  {} {} {} km/h\n",
+        icon[1],
         format_wind_dir_icon(wd_deg),
         wd_cardinal,
-        ws
+        ws as i64
     ));
-    out.push_str(&format!(
-        "                  {}: {}%  {}: {}mm\n",
-        lang.cloud_cover(),
-        tcc,
-        lang.precipitation(),
-        tp
-    ));
-    out.push_str(&format!(
-        "                  {}: {}\n",
-        lang.visibility(),
-        vs_text
-    ));
+    out.push_str(&format!("{}  {}\n", icon[2], vs_text));
+    out.push_str(&format!("                {} mm\n", tp));
 
     let locale = Locale::en_US;
     let day_labels = [lang.today(), lang.tomorrow(), lang.day_after_tomorrow()];
