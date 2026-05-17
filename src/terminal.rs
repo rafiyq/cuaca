@@ -5,6 +5,7 @@ use crate::format::{celsius_to_fahrenheit, format_temp, format_wind_dir_icon};
 use crate::lang::Lang;
 
 const VLINE: &str = "│";
+const HLINE: &str = "─";
 const TL: &str = "┌";
 const TR: &str = "┐";
 const BL: &str = "└";
@@ -16,8 +17,8 @@ const LEFT_T: &str = "├";
 const RIGHT_T: &str = "┤";
 
 const CELL_WIDTH: usize = 18;
-const COLS: usize = 6;
 const TAB_WIDTH: usize = 13;
+const ROWS: usize = 7;
 
 pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
     let lang = args.lang;
@@ -109,6 +110,8 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
             continue;
         }
 
+        let ncols = slots.len();
+
         let date_str = slots
             .first()
             .and_then(|s| s["local_datetime"].as_str())
@@ -123,7 +126,7 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
             date_str
         };
 
-        let total_width = COLS * CELL_WIDTH + (COLS - 1);
+        let total_width = ncols * CELL_WIDTH + (ncols - 1);
         let header_len = header.len();
         let header_start = TAB_WIDTH + (total_width - header_len) / 2;
         let header_pad = format!("{:header_start$}", "");
@@ -132,7 +135,7 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
         out.push_str(&format!("{}{}\n", header_pad, header));
 
         out.push_str(&format!("{:TAB_WIDTH$}{}", "", TL));
-        for (i, slot) in slots.iter().take(COLS).enumerate() {
+        for (i, slot) in slots.iter().take(ncols).enumerate() {
             let time_str = slot["local_datetime"]
                 .as_str()
                 .and_then(|s| NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").ok())
@@ -143,15 +146,15 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
             } else {
                 time_str[..CELL_WIDTH].to_string()
             };
-            let sep = if i == COLS - 1 { TR } else { TOP_T };
+            let sep = if i == ncols - 1 { TR } else { TOP_T };
             out.push_str(&format!("{}{}", cell_label, sep));
         }
         out.push('\n');
 
         out.push_str(&format!("{:TAB_WIDTH$}{}", "", LEFT_T));
-        for i in 0..COLS {
-            out.push_str(&format!("{:CELL_WIDTH$}", ""));
-            if i < COLS - 1 {
+        for i in 0..ncols {
+            out.push_str(&HLINE.repeat(CELL_WIDTH));
+            if i < ncols - 1 {
                 out.push_str(CROSS);
             } else {
                 out.push_str(RIGHT_T);
@@ -159,9 +162,9 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
         }
         out.push('\n');
 
-        for row_idx in 0..5 {
+        for row_idx in 0..ROWS {
             out.push_str(&format!("{:TAB_WIDTH$}{}", "", VLINE));
-            for slot in slots.iter().take(COLS) {
+            for slot in slots.iter().take(ncols) {
                 let cell = render_cell_row(slot, row_idx, lang, fahrenheit, args.nerd);
                 out.push_str(&format!("{:<CELL_WIDTH$}{}", cell, VLINE));
             }
@@ -169,9 +172,9 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
         }
 
         out.push_str(&format!("{:TAB_WIDTH$}{}", "", BL));
-        for i in 0..COLS {
-            out.push_str(&format!("{:CELL_WIDTH$}", ""));
-            if i < COLS - 1 {
+        for i in 0..ncols {
+            out.push_str(&HLINE.repeat(CELL_WIDTH));
+            if i < ncols - 1 {
                 out.push_str(BOTTOM_T);
             } else {
                 out.push_str(BR);
@@ -221,6 +224,26 @@ fn render_cell_row(slot: &Value, row: usize, lang: Lang, fahrenheit: bool, nerd:
                 format!("{:.max_len$}", wind_str)
             } else {
                 format!("{:^CELL_WIDTH$}", wind_str)
+            }
+        }
+        5 => {
+            let vs = slot["vs_text"].as_str().unwrap_or("?");
+            let max_len = CELL_WIDTH.saturating_sub(1);
+            if vs.len() > max_len {
+                format!("{:.max_len$}", vs)
+            } else {
+                format!("{:^CELL_WIDTH$}", vs)
+            }
+        }
+        6 => {
+            let tp = slot["tp"].as_f64().unwrap_or(0.0);
+            let hu = slot["hu"].as_i64().unwrap_or(0);
+            let rain_str = format!("{:.1}mm | {}%", tp, hu);
+            let max_len = CELL_WIDTH.saturating_sub(1);
+            if rain_str.len() > max_len {
+                format!("{:.max_len$}", rain_str)
+            } else {
+                format!("{:^CELL_WIDTH$}", rain_str)
             }
         }
         _ => String::new(),
