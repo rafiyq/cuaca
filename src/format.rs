@@ -1,6 +1,8 @@
 use chrono::{NaiveDateTime, Timelike};
 
-use crate::constants::{FALLBACK_ICON, FALLBACK_ICON_NERD, ICON_PLACEHOLDER};
+use crate::constants::{
+    FALLBACK_ICON, FALLBACK_ICON_NERD, ICON_PLACEHOLDER, WEATHER_CODES, WEATHER_CODES_NERD,
+};
 
 pub fn format_time(local_datetime: &str, ampm: bool) -> String {
     let dt =
@@ -57,7 +59,6 @@ pub fn format_wind_dir_icon(degrees: i64, nerd: bool) -> &'static str {
 }
 
 pub fn get_weather_icon(code: u32, nerd: bool) -> &'static str {
-    use crate::constants::{WEATHER_CODES, WEATHER_CODES_NERD};
     let table = if nerd {
         WEATHER_CODES_NERD
     } else {

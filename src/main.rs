@@ -13,6 +13,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::cli::{Args, OutputFormat};
+use crate::constants::{CLOUD_COVER_ICON, ERROR_ICON, PRECIPITATION_ICON, VISIBILITY_ICON};
 use crate::format::{
     celsius_to_fahrenheit, format_indicator, format_temp, format_time, format_wind_dir_icon,
     get_weather_icon,
@@ -23,11 +24,6 @@ mod constants;
 mod format;
 mod lang;
 mod terminal;
-
-const CLOUD_COVER_ICON: &str = "\u{2601}\u{fe0f}";
-const PRECIPITATION_ICON: &str = "\u{1f327}\u{fe0f}";
-const VISIBILITY_ICON: &str = "\u{1f441}\u{fe0f}";
-const ERROR_ICON: &str = "\u{26d3}\u{fe0f}";
 
 fn cache_dir() -> PathBuf {
     std::env::temp_dir()

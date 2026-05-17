@@ -1,7 +1,8 @@
-use chrono::{Locale, NaiveDateTime, Timelike};
+use chrono::{Locale, NaiveDateTime};
 use serde_json::Value;
 
-use crate::format::{celsius_to_fahrenheit, format_temp, format_wind_dir_icon};
+use crate::constants::get_ascii_icon;
+use crate::format::{celsius_to_fahrenheit, format_temp};
 use crate::lang::Lang;
 
 const VLINE: &str = "│";
@@ -10,14 +11,13 @@ const TL: &str = "┌";
 const TR: &str = "┐";
 const BL: &str = "└";
 const BR: &str = "┘";
-const CROSS: &str = "┼";
 const TOP_T: &str = "┬";
 const BOTTOM_T: &str = "┴";
-const LEFT_T: &str = "├";
-const RIGHT_T: &str = "┤";
 
-const CELL_WIDTH: usize = 18;
-const ROWS: usize = 7;
+const CELL_WIDTH: usize = 29;
+const ICON_WIDTH: usize = 13;
+const DATA_WIDTH: usize = CELL_WIDTH - ICON_WIDTH;
+const ICON_COLS: usize = 5;
 
 pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
     let lang = args.lang;
@@ -83,7 +83,7 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
     out.push_str(&format!(
         "                  {}: {} {} {} km/h\n",
         lang.wind(),
-        format_wind_dir_icon(wd_deg, args.nerd),
+        format_wind_dir_icon(wd_deg),
         wd_cardinal,
         ws
     ));
@@ -144,37 +144,10 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
         }
         out.push('\n');
 
-        out.push_str(VLINE);
-        for slot in slots.iter().take(ncols) {
-            let time_str = slot["local_datetime"]
-                .as_str()
-                .and_then(|s| NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").ok())
-                .map(|dt| format!("{:02}:{:02}", dt.hour(), dt.minute()))
-                .unwrap_or("??:??".to_string());
-            let cell_label = if time_str.len() <= CELL_WIDTH {
-                format!("{:^CELL_WIDTH$}", time_str)
-            } else {
-                time_str[..CELL_WIDTH].to_string()
-            };
-            out.push_str(&format!("{}{}", cell_label, VLINE));
-        }
-        out.push('\n');
-
-        out.push_str(LEFT_T);
-        for i in 0..ncols {
-            out.push_str(&HLINE.repeat(CELL_WIDTH));
-            if i < ncols - 1 {
-                out.push_str(CROSS);
-            } else {
-                out.push_str(RIGHT_T);
-            }
-        }
-        out.push('\n');
-
-        for row_idx in 0..ROWS {
+        for row_idx in 0..ICON_COLS {
             out.push_str(VLINE);
             for slot in slots.iter().take(ncols) {
-                let cell = render_cell_row(slot, row_idx, lang, fahrenheit, args.nerd);
+                let cell = render_cell_row(slot, row_idx, lang, fahrenheit);
                 out.push_str(&format!("{:<CELL_WIDTH$}{}", cell, VLINE));
             }
             out.push('\n');
@@ -198,79 +171,70 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
     out
 }
 
-fn render_cell_row(slot: &Value, row: usize, lang: Lang, fahrenheit: bool, nerd: bool) -> String {
+fn render_cell_row(slot: &Value, row: usize, lang: Lang, fahrenheit: bool) -> String {
     let weather_desc_key = lang.weather_desc_key();
-    let ws = slot["ws"].as_f64().unwrap_or(0.0);
-    let wd_deg = slot["wd_deg"].as_i64().unwrap_or(0);
-    let wd_cardinal = slot["wd"].as_str().unwrap_or("?");
-    let temp_c = slot["t"].as_i64().unwrap_or(0);
-    let temp = if fahrenheit {
-        celsius_to_fahrenheit(temp_c)
-    } else {
-        temp_c
-    };
-
     let icon = get_ascii_icon(slot["weather"].as_u64().unwrap_or(0) as u32);
+    let icon_line = icon[row];
 
+    let data = get_cell_data(slot, row, weather_desc_key, fahrenheit);
+
+    format!("{:<ICON_WIDTH$}{:<DATA_WIDTH$}", icon_line, data)
+}
+
+fn get_cell_data(slot: &Value, row: usize, desc_key: &str, fahrenheit: bool) -> String {
     match row {
-        0 => format!("{:CELL_WIDTH$}", icon.0),
-        1 => format!("{:CELL_WIDTH$}", icon.1),
-        2 => {
-            let desc = slot[weather_desc_key].as_str().unwrap_or("?");
-            let max_len = CELL_WIDTH.saturating_sub(1);
-            if desc.len() > max_len {
-                format!("{}…", &desc[..max_len.saturating_sub(1)])
+        0 => {
+            let desc = slot[desc_key].as_str().unwrap_or("?");
+            let max = DATA_WIDTH.saturating_sub(1);
+            if desc.len() > max {
+                format!("{}…", &desc[..max.saturating_sub(1)])
             } else {
                 desc.to_string()
             }
         }
-        3 => format!("{:^CELL_WIDTH$}", format_temp(temp)),
-        4 => {
-            let dir_icon = format_wind_dir_icon(wd_deg, nerd);
-            let wind_str = format!("{} {} {}", dir_icon, wd_cardinal, ws as i64);
-            let max_len = CELL_WIDTH.saturating_sub(1);
-            if wind_str.len() > max_len {
-                format!("{:.max_len$}", wind_str)
+        1 => {
+            let temp_c = slot["t"].as_i64().unwrap_or(0);
+            let temp = if fahrenheit {
+                celsius_to_fahrenheit(temp_c)
             } else {
-                format!("{:^CELL_WIDTH$}", wind_str)
-            }
+                temp_c
+            };
+            format_temp(temp)
         }
-        5 => {
+        2 => {
+            let wd_deg = slot["wd_deg"].as_i64().unwrap_or(0);
+            let wd_cardinal = slot["wd"].as_str().unwrap_or("?");
+            let ws = slot["ws"].as_f64().unwrap_or(0.0);
+            format!(
+                "{} {} {} km/h",
+                format_wind_dir_icon(wd_deg),
+                wd_cardinal,
+                ws as i64
+            )
+        }
+        3 => {
             let vs = slot["vs_text"].as_str().unwrap_or("?");
-            let max_len = CELL_WIDTH.saturating_sub(1);
-            if vs.len() > max_len {
-                format!("{:.max_len$}", vs)
-            } else {
-                format!("{:^CELL_WIDTH$}", vs)
-            }
+            vs.to_string()
         }
-        6 => {
+        4 => {
             let tp = slot["tp"].as_f64().unwrap_or(0.0);
             let hu = slot["hu"].as_i64().unwrap_or(0);
-            let rain_str = format!("{:.1}mm | {}%", tp, hu);
-            let max_len = CELL_WIDTH.saturating_sub(1);
-            if rain_str.len() > max_len {
-                format!("{:.max_len$}", rain_str)
-            } else {
-                format!("{:^CELL_WIDTH$}", rain_str)
-            }
+            format!("{:.1}mm | {}%", tp, hu)
         }
         _ => String::new(),
     }
 }
 
-fn get_ascii_icon(code: u32) -> (&'static str, &'static str) {
-    match code {
-        0 | 1 => ("    \\   /    ", "     .-.     "),
-        2 => ("    \\   /    ", "   __)__     "),
-        3 => ("             ", " .--.        "),
-        4 => ("             ", " .--.        "),
-        5 | 10 => ("             ", " - - - -     "),
-        45 => ("             ", " - - - -     "),
-        60 | 61 => (" _`/\"\".-.   ", "  ,\\_(   ).  "),
-        63 => (" _`/\"\".-.   ", "  ,\\_(   ).  "),
-        80 => (" _`/\"\".-.   ", "  ,\\_(   ).  "),
-        95 | 97 => ("     .-.     ", "   (   ).    "),
-        _ => ("             ", "     .-.     "),
-    }
+fn format_wind_dir_icon(degrees: i64) -> &'static str {
+    let dir = ((degrees % 360) as f64 / 45.0).round() as usize % 8;
+    [
+        "\u{2b06}\u{fe0f}",
+        "\u{2197}\u{fe0f}",
+        "\u{27a1}\u{fe0f}",
+        "\u{2198}\u{fe0f}",
+        "\u{2b07}\u{fe0f}",
+        "\u{2199}\u{fe0f}",
+        "\u{2b05}\u{fe0f}",
+        "\u{2196}\u{fe0f}",
+    ][dir]
 }
