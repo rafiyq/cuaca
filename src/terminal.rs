@@ -125,8 +125,11 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
         };
 
         out.push('\n');
-        out.push_str(&format!("{:TAB_WIDTH$}{} {}\n", "", TL, &header,));
-        out.push_str(&format!("{:TAB_WIDTH$}{}\n", "", TR,));
+        let total_width = COLS * CELL_WIDTH + (COLS - 1);
+        let header_len = header.len();
+        let header_start = TAB_WIDTH + (total_width - header_len) / 2;
+        let header_pad = format!("{:header_start$}", "");
+        out.push_str(&format!("{}{}\n", header_pad, header));
 
         out.push_str(&format!("{:TAB_WIDTH$}{}", "", TL));
         for i in 0..COLS {
@@ -172,7 +175,7 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
     }
 
     out.push('\n');
-    out.push_str(&format!("Source: {}", lang.source()));
+    out.push_str(&format!("{}\n", lang.source()));
 
     out
 }
@@ -202,7 +205,7 @@ fn render_cell_row(slot: &Value, row: usize, lang: Lang, fahrenheit: bool, nerd:
                 desc.to_string()
             }
         }
-        3 => format!("  {:>10}°C", format_temp(temp)),
+        3 => format!("  {:>10}", format_temp(temp)),
         4 => {
             let dir_icon = format_wind_dir_icon(wd_deg, nerd);
             format!("  {} {} {} km/h", dir_icon, wd_cardinal, ws)
