@@ -1,4 +1,4 @@
-use chrono::{Locale, NaiveDateTime};
+use chrono::{Locale, NaiveDateTime, Timelike};
 use serde_json::Value;
 
 use crate::constants::get_ascii_icon;
@@ -13,6 +13,9 @@ const BL: &str = "└";
 const BR: &str = "┘";
 const TOP_T: &str = "┬";
 const BOTTOM_T: &str = "┴";
+const CROSS: &str = "┼";
+const LEFT_T: &str = "├";
+const RIGHT_T: &str = "┤";
 
 const CELL_WIDTH: usize = 29;
 const ICON_WIDTH: usize = 13;
@@ -93,7 +96,6 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
     out.push_str(&format!("                {} mm\n", tp));
 
     let locale = Locale::en_US;
-    let day_labels = [lang.today(), lang.tomorrow(), lang.day_after_tomorrow()];
 
     for (group_idx, group) in cuaca_groups.iter().enumerate() {
         let slots: Vec<&Value> = group.as_array().map_or(vec![], |s| s.iter().collect());
@@ -110,28 +112,89 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
             .map(|dt| dt.date().format_localized("%a %d %b", locale).to_string())
             .unwrap_or_else(|| "Unknown".to_string());
 
-        let day_label = day_labels.get(group_idx).unwrap_or(&"");
-        let header = if !day_label.is_empty() {
-            format!("{}, {}", day_label, date_str)
-        } else {
-            date_str
-        };
-
         let total_width = ncols * CELL_WIDTH + (ncols - 1);
-        let header_len = header.len();
-        let header_start = (total_width - header_len) / 2;
-        let header_pad = format!("{:header_start$}", "");
+        let tab_width = date_str.len() + 4;
+        let tab_start = (total_width - tab_width) / 2;
 
         out.push('\n');
-        out.push_str(&format!("{}{}\n", header_pad, header));
 
+        // Tab top line
+        out.push_str(&" ".repeat(tab_start));
         out.push_str(TL);
+        out.push_str(&HLINE.repeat(tab_width - 2));
+        out.push_str(TR);
+        out.push('\n');
+
+        // Top border with embedded date tab
+        let mut border: Vec<char> = Vec::with_capacity(total_width + ncols + 1);
+        border.push(TL.chars().next().unwrap());
+        for i in 0..ncols {
+            for _ in 0..CELL_WIDTH {
+                border.push(HLINE.chars().next().unwrap());
+            }
+            if i < ncols - 1 {
+                border.push(TOP_T.chars().next().unwrap());
+            }
+        }
+        border.push(TR.chars().next().unwrap());
+
+        let tab_content = format!("{} {:^w$} {}", RIGHT_T, date_str, LEFT_T, w = tab_width - 2);
+        for (i, c) in tab_content.chars().enumerate() {
+            let idx = tab_start + 1 + i;
+            if idx < border.len() {
+                border[idx] = c;
+            }
+        }
+        for c in &border {
+            out.push(*c);
+        }
+        out.push('\n');
+
+        // Hours header with tab bottom
+        let mut header: Vec<char> = Vec::new();
+        header.push(VLINE.chars().next().unwrap());
+        for slot in slots.iter().take(ncols) {
+            let time_str = slot["local_datetime"]
+                .as_str()
+                .and_then(|s| NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").ok())
+                .map(|dt| format!("{:02}:{:02}", dt.hour(), dt.minute()))
+                .unwrap_or("??:??".to_string());
+            let cell = format!("{:^CELL_WIDTH$}", time_str);
+            for c in cell.chars() {
+                header.push(c);
+            }
+            header.push(VLINE.chars().next().unwrap());
+        }
+
+        let left_h = (tab_width - 3) / 2;
+        let right_h = tab_width - 3 - left_h;
+        let tab_bottom = format!(
+            "{}{}{}{}{}",
+            BL,
+            HLINE.repeat(left_h),
+            BOTTOM_T,
+            HLINE.repeat(right_h),
+            BR
+        );
+        for (i, c) in tab_bottom.chars().enumerate() {
+            let idx = tab_start + 1 + i;
+            if idx < header.len() {
+                header[idx] = c;
+            }
+        }
+        for c in &header {
+            out.push(*c);
+        }
+        out.push('\n');
+
+        // Separator row
+        out.push_str(LEFT_T);
         for i in 0..ncols {
             out.push_str(&HLINE.repeat(CELL_WIDTH));
             if i < ncols - 1 {
-                out.push_str(TOP_T);
+                out.push_str(CROSS);
             } else {
-                out.push_str(TR);
+                out.push_str(RIGHT_T);
             }
         }
         out.push('\n');
