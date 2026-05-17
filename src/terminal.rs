@@ -17,7 +17,6 @@ const LEFT_T: &str = "├";
 const RIGHT_T: &str = "┤";
 
 const CELL_WIDTH: usize = 18;
-const TAB_WIDTH: usize = 13;
 const ROWS: usize = 7;
 
 pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
@@ -128,14 +127,25 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
 
         let total_width = ncols * CELL_WIDTH + (ncols - 1);
         let header_len = header.len();
-        let header_start = TAB_WIDTH + (total_width - header_len) / 2;
+        let header_start = (total_width - header_len) / 2;
         let header_pad = format!("{:header_start$}", "");
 
         out.push('\n');
         out.push_str(&format!("{}{}\n", header_pad, header));
 
-        out.push_str(&format!("{:TAB_WIDTH$}{}", "", TL));
-        for (i, slot) in slots.iter().take(ncols).enumerate() {
+        out.push_str(TL);
+        for i in 0..ncols {
+            out.push_str(&HLINE.repeat(CELL_WIDTH));
+            if i < ncols - 1 {
+                out.push_str(TOP_T);
+            } else {
+                out.push_str(TR);
+            }
+        }
+        out.push('\n');
+
+        out.push_str(VLINE);
+        for slot in slots.iter().take(ncols) {
             let time_str = slot["local_datetime"]
                 .as_str()
                 .and_then(|s| NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").ok())
@@ -146,12 +156,11 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
             } else {
                 time_str[..CELL_WIDTH].to_string()
             };
-            let sep = if i == ncols - 1 { TR } else { TOP_T };
-            out.push_str(&format!("{}{}", cell_label, sep));
+            out.push_str(&format!("{}{}", cell_label, VLINE));
         }
         out.push('\n');
 
-        out.push_str(&format!("{:TAB_WIDTH$}{}", "", LEFT_T));
+        out.push_str(LEFT_T);
         for i in 0..ncols {
             out.push_str(&HLINE.repeat(CELL_WIDTH));
             if i < ncols - 1 {
@@ -163,7 +172,7 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
         out.push('\n');
 
         for row_idx in 0..ROWS {
-            out.push_str(&format!("{:TAB_WIDTH$}{}", "", VLINE));
+            out.push_str(VLINE);
             for slot in slots.iter().take(ncols) {
                 let cell = render_cell_row(slot, row_idx, lang, fahrenheit, args.nerd);
                 out.push_str(&format!("{:<CELL_WIDTH$}{}", cell, VLINE));
@@ -171,7 +180,7 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
             out.push('\n');
         }
 
-        out.push_str(&format!("{:TAB_WIDTH$}{}", "", BL));
+        out.push_str(BL);
         for i in 0..ncols {
             out.push_str(&HLINE.repeat(CELL_WIDTH));
             if i < ncols - 1 {
