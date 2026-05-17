@@ -1,4 +1,4 @@
-use chrono::{Locale, NaiveDateTime};
+use chrono::{Locale, NaiveDateTime, Timelike};
 use serde_json::Value;
 
 use crate::format::{celsius_to_fahrenheit, format_temp, format_wind_dir_icon};
@@ -15,8 +15,8 @@ const BOTTOM_T: &str = "┴";
 const LEFT_T: &str = "├";
 const RIGHT_T: &str = "┤";
 
-const CELL_WIDTH: usize = 30;
-const COLS: usize = 3;
+const CELL_WIDTH: usize = 18;
+const COLS: usize = 6;
 const TAB_WIDTH: usize = 13;
 
 pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
@@ -102,7 +102,6 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
 
     let locale = Locale::en_US;
     let day_labels = [lang.today(), lang.tomorrow(), lang.day_after_tomorrow()];
-    let time_labels = ["Morning", "Noon", "Evening"];
 
     for (group_idx, group) in cuaca_groups.iter().enumerate() {
         let slots: Vec<&Value> = group.as_array().map_or(vec![], |s| s.iter().collect());
@@ -124,21 +123,28 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
             date_str
         };
 
-        out.push('\n');
         let total_width = COLS * CELL_WIDTH + (COLS - 1);
         let header_len = header.len();
         let header_start = TAB_WIDTH + (total_width - header_len) / 2;
         let header_pad = format!("{:header_start$}", "");
+
+        out.push('\n');
         out.push_str(&format!("{}{}\n", header_pad, header));
 
         out.push_str(&format!("{:TAB_WIDTH$}{}", "", TL));
-        for i in 0..COLS {
-            let label = time_labels.get(i).unwrap_or(&"");
-            out.push_str(&format!(
-                "{:^CELL_WIDTH$}{}",
-                label,
-                if i < COLS - 1 { TOP_T } else { TR }
-            ));
+        for (i, slot) in slots.iter().take(COLS).enumerate() {
+            let time_str = slot["local_datetime"]
+                .as_str()
+                .and_then(|s| NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").ok())
+                .map(|dt| format!("{:02}:{:02}", dt.hour(), dt.minute()))
+                .unwrap_or("??:??".to_string());
+            let cell_label = if time_str.len() <= CELL_WIDTH {
+                format!("{:^CELL_WIDTH$}", time_str)
+            } else {
+                time_str[..CELL_WIDTH].to_string()
+            };
+            let sep = if i == COLS - 1 { TR } else { TOP_T };
+            out.push_str(&format!("{}{}", cell_label, sep));
         }
         out.push('\n');
 
@@ -195,20 +201,27 @@ fn render_cell_row(slot: &Value, row: usize, lang: Lang, fahrenheit: bool, nerd:
     let icon = get_ascii_icon(slot["weather"].as_u64().unwrap_or(0) as u32);
 
     match row {
-        0 => format!("{:>16}", icon.0),
-        1 => format!("{:>16}", icon.1),
+        0 => format!("{:CELL_WIDTH$}", icon.0),
+        1 => format!("{:CELL_WIDTH$}", icon.1),
         2 => {
             let desc = slot[weather_desc_key].as_str().unwrap_or("?");
-            if desc.len() > CELL_WIDTH {
-                desc[..CELL_WIDTH].to_string()
+            let max_len = CELL_WIDTH.saturating_sub(1);
+            if desc.len() > max_len {
+                format!("{}…", &desc[..max_len.saturating_sub(1)])
             } else {
                 desc.to_string()
             }
         }
-        3 => format!("  {:>10}", format_temp(temp)),
+        3 => format!("{:^CELL_WIDTH$}", format_temp(temp)),
         4 => {
             let dir_icon = format_wind_dir_icon(wd_deg, nerd);
-            format!("  {} {} {} km/h", dir_icon, wd_cardinal, ws)
+            let wind_str = format!("{} {} {}", dir_icon, wd_cardinal, ws as i64);
+            let max_len = CELL_WIDTH.saturating_sub(1);
+            if wind_str.len() > max_len {
+                format!("{:.max_len$}", wind_str)
+            } else {
+                format!("{:^CELL_WIDTH$}", wind_str)
+            }
         }
         _ => String::new(),
     }
@@ -216,8 +229,8 @@ fn render_cell_row(slot: &Value, row: usize, lang: Lang, fahrenheit: bool, nerd:
 
 fn get_ascii_icon(code: u32) -> (&'static str, &'static str) {
     match code {
-        0 | 1 => ("   \\  /     ", " _ / \"\".-.  "),
-        2 => ("    \\   /   ", "     .-.     "),
+        0 | 1 => ("    \\   /    ", "     .-.     "),
+        2 => ("    \\   /    ", "   __)__     "),
         3 => ("             ", " .--.        "),
         4 => ("             ", " .--.        "),
         5 | 10 => ("             ", " - - - -     "),
