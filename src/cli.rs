@@ -1,12 +1,22 @@
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 
 use crate::lang::Lang;
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum OutputFormat {
+    #[value(name = "bar")]
+    Bar,
+    #[value(name = "text")]
+    Text,
+    #[value(name = "json")]
+    Json,
+}
 
 #[derive(Parser, Debug)]
 #[command(
     name = "cuaca",
     version,
-    about = "A weather indicator for Waybar using BMKG weather data",
+    about = "A weather indicator using BMKG data",
     long_about = None
 )]
 pub struct Args {
@@ -30,9 +40,17 @@ pub struct Args {
         short,
         long,
         default_value = "en",
-        help = "Language for tooltip labels"
+        help = "Language for labels"
     )]
     pub lang: Lang,
+
+    #[arg(
+        value_enum,
+        long,
+        default_value = "bar",
+        help = "Output format: bar (Waybar JSON), text (terminal display), json (raw data)"
+    )]
+    pub format: OutputFormat,
 
     #[arg(
         long,

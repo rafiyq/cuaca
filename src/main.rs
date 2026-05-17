@@ -12,7 +12,7 @@ use reqwest::blocking::Client;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::cli::Args;
+use crate::cli::{Args, OutputFormat};
 use crate::format::{
     celsius_to_fahrenheit, format_indicator, format_temp, format_time, format_wind_dir_icon,
     get_weather_icon,
@@ -22,6 +22,7 @@ mod cli;
 mod constants;
 mod format;
 mod lang;
+mod terminal;
 
 const CLOUD_COVER_ICON: &str = "\u{2601}\u{fe0f}";
 const PRECIPITATION_ICON: &str = "\u{1f327}\u{fe0f}";
@@ -444,8 +445,19 @@ fn main() {
         .unwrap_or_default();
     data.insert("class", css_class);
 
-    let json_data = json!(data);
-    println!("{}", json_data);
+    match args.format {
+        OutputFormat::Bar => {
+            let json_data = json!(data);
+            println!("{}", json_data);
+        }
+        OutputFormat::Text => {
+            let output = terminal::render_terminal(&weather, &args);
+            println!("{}", output);
+        }
+        OutputFormat::Json => {
+            println!("{}", serde_json::to_string_pretty(&weather).unwrap());
+        }
+    }
 }
 
 fn fetch_weather(
