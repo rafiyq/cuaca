@@ -72,11 +72,33 @@ pub fn vis_spark(text: &str) -> String {
     paint(text, "\x1b[38;5;51m")
 }
 
+fn strip_ansi(s: &str) -> String {
+    let mut result = String::new();
+    let mut chars = s.chars();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            // Skip until 'm' (inclusive)
+            while let Some(c2) = chars.next() {
+                if c2 == 'm' {
+                    break;
+                }
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
 pub fn weather_icon_line(line: &str, code: u32) -> String {
     if !is_color() {
+        return strip_ansi(line);
+    }
+    // If line already contains ANSI codes, assume it's pre-colored and return as-is.
+    if line.contains('\x1b') {
         return line.to_string();
     }
-    let code = match code {
+    let color_code = match code {
         0 | 1 => "\x1b[38;5;226m",
         2 => "\x1b[38;5;220m",
         3 | 4 => "\x1b[38;5;248m",
@@ -86,7 +108,7 @@ pub fn weather_icon_line(line: &str, code: u32) -> String {
         95 | 97 => "\x1b[38;5;201m",
         _ => "\x1b[38;5;250m",
     };
-    format!("{}{}{}", code, line, RESET)
+    format!("{}{}{}", color_code, line, RESET)
 }
 
 pub fn desc_text(text: &str, code: u32) -> String {
