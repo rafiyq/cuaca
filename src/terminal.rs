@@ -4,7 +4,7 @@ use serde_json::Value;
 use crate::color;
 use crate::constants::get_ascii_icon;
 use crate::format::celsius_to_fahrenheit;
-use crate::graphs::{sparkline_panel, temperature_panel};
+use crate::graphs::column_chart_panel;
 
 pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
     let lang = args.lang;
@@ -45,11 +45,8 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
         return "No forecast data available".to_string();
     }
 
-    let today_slots: Vec<&Value> = cuaca_groups
-        .first()
-        .and_then(|g| g.as_array())
-        .map(|s| s.iter().collect())
-        .unwrap_or_default();
+    // Use the first 8 chronological slots for the column charts (may span multiple days)
+    let chart_slots: Vec<&Value> = all_slots.iter().take(8).map(|(_, slot)| *slot).collect();
 
     let first_slot = all_slots[0].1;
     let weather_desc_key = lang.weather_desc_key();
@@ -122,7 +119,7 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
     ));
     out.push('\n');
 
-    let temps: Vec<f64> = today_slots
+    let temps: Vec<f64> = chart_slots
         .iter()
         .map(|s| {
             let t = s["t"].as_f64().unwrap_or(0.0);
@@ -133,24 +130,24 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
             }
         })
         .collect();
-    let rains: Vec<f64> = today_slots
+    let rains: Vec<f64> = chart_slots
         .iter()
         .map(|s| s["tp"].as_f64().unwrap_or(0.0))
         .collect();
-    let humids: Vec<f64> = today_slots
+    let humids: Vec<f64> = chart_slots
         .iter()
         .map(|s| s["hu"].as_f64().unwrap_or(0.0))
         .collect();
-    let winds: Vec<f64> = today_slots
+    let winds: Vec<f64> = chart_slots
         .iter()
         .map(|s| s["ws"].as_f64().unwrap_or(0.0))
         .collect();
-    let clouds: Vec<f64> = today_slots
+    let clouds: Vec<f64> = chart_slots
         .iter()
         .map(|s| s["tcc"].as_f64().unwrap_or(0.0))
         .collect();
 
-    let vis_vals: Vec<f64> = today_slots
+    let vis_vals: Vec<f64> = chart_slots
         .iter()
         .map(|s| {
             s["vs_text"]
@@ -163,7 +160,7 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
         })
         .collect();
 
-    let times: Vec<String> = today_slots
+    let times: Vec<String> = chart_slots
         .iter()
         .map(|s| {
             let dt_str = s["local_datetime"].as_str().unwrap_or("");
@@ -186,12 +183,14 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
 
     let height = args.yticks.clamp(3, 6);
 
-    let mut temp_rows = temperature_panel(&temps, &times, height);
-    let mut rain_rows = sparkline_panel(&rains, &times, height);
-    let mut humid_rows = sparkline_panel(&humids, &times, height);
-    let mut wind_rows = sparkline_panel(&winds, &times, height);
-    let mut cloud_rows = sparkline_panel(&clouds, &times, height);
-    let mut vis_rows = sparkline_panel(&vis_vals, &times, height);
+    let mut temp_rows = column_chart_panel(&temps, &times, height, |v| {
+        format!("{:.0}°", v.round() as i64)
+    });
+    let mut rain_rows = column_chart_panel(&rains, &times, height, |v| format!("{:.1}", v));
+    let mut humid_rows = column_chart_panel(&humids, &times, height, |v| format!("{:.1}", v));
+    let mut wind_rows = column_chart_panel(&winds, &times, height, |v| format!("{:.1}", v));
+    let mut cloud_rows = column_chart_panel(&clouds, &times, height, |v| format!("{:.1}", v));
+    let mut vis_rows = column_chart_panel(&vis_vals, &times, height, |v| format!("{:.1}", v));
 
     colorize_temp_panel(&mut temp_rows, &temps);
     colorize_spark_panel(&mut rain_rows, color::rain_bar);

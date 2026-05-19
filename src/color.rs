@@ -100,7 +100,3 @@ pub fn header(text: &str) -> String {
 pub fn dim(text: &str) -> String {
     paint(text, "\x1b[2m")
 }
-
-pub fn panel_title(text: &str) -> String {
-    paint(text, "\x1b[1;36m")
-}
