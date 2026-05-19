@@ -19,6 +19,8 @@ use crate::format::{
     get_weather_icon,
 };
 
+use crate::lang::Lang;
+
 mod cli;
 mod color;
 mod constants;
@@ -315,11 +317,12 @@ fn main() {
     let wd_deg = first_slot["wd_deg"].as_i64().unwrap_or(0);
     let wd_cardinal = first_slot["wd"].as_str().unwrap_or("?");
     tooltip += &format!(
-        "{}: {} {} {} km/h\n",
+        "{}: {} {} {} {}\n",
         lang.wind(),
         format_wind_dir_icon(wd_deg, args.nerd),
         wd_cardinal,
-        ws
+        ws,
+        lang.wind_unit(),
     );
 
     let vs_text = first_slot["vs_text"].as_str().unwrap_or("?");
@@ -337,7 +340,10 @@ fn main() {
 
     tooltip += &format!("{}: {}\n", lang.location(), location_parts.join(", "));
 
-    let locale = Locale::en_US;
+    let locale = match lang {
+        Lang::EN => Locale::en_US,
+        Lang::ID => Locale::id_ID,
+    };
 
     let mut all_flat_slots: Vec<(&Value, usize)> = cuaca_groups
         .iter()
@@ -400,13 +406,14 @@ fn main() {
         };
 
         let mut line = format!(
-            "{}  {}  {}  {}  {} {} km/h",
+            "{}  {}  {}  {}  {} {} {}",
             format_time(local_dt, args.ampm),
             get_weather_icon(slot["weather"].as_u64().unwrap_or(0) as u32, args.nerd),
             format_temp(temp),
             desc,
             format_wind_dir_icon(wd_val, args.nerd),
             ws_val,
+            lang.wind_unit(),
         );
 
         if !args.hide_details {

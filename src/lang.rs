@@ -110,7 +110,7 @@ impl Lang {
     pub fn wind_label(&self) -> &'static str {
         match self {
             Self::EN => "WIND (km/h)",
-            Self::ID => "ANGIN (km/h)",
+            Self::ID => "ANGIN (km/j)",
         }
     }
 
@@ -130,8 +130,29 @@ impl Lang {
 
     pub fn total(&self) -> &'static str {
         match self {
-            Self::EN => "total",
-            Self::ID => "total",
+            Self::EN => "Total",
+            Self::ID => "Jumlah",
+        }
+    }
+
+    pub fn weather_report(&self) -> &'static str {
+        match self {
+            Self::EN => "Weather Report",
+            Self::ID => "Prakiraan Cuaca",
+        }
+    }
+
+    pub fn wind_unit(&self) -> &'static str {
+        match self {
+            Self::EN => "km/h",
+            Self::ID => "km/j",
+        }
+    }
+
+    pub fn average_label(&self) -> &'static str {
+        match self {
+            Self::EN => "avg",
+            Self::ID => "rata-rata",
         }
     }
 }

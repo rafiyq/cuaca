@@ -9,6 +9,10 @@ use crate::graphs::column_chart_panel;
 pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
     let lang = args.lang;
     let fahrenheit = args.fahrenheit;
+    let locale = match lang {
+        crate::lang::Lang::EN => Locale::en_US,
+        crate::lang::Lang::ID => Locale::id_ID,
+    };
 
     let lokasi = &weather["lokasi"];
     let provinsi = lokasi["provinsi"].as_str().unwrap_or("");
@@ -92,16 +96,16 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
 
     let first_dt = first_slot["local_datetime"].as_str().unwrap_or("");
     let first_date = NaiveDateTime::parse_from_str(first_dt, "%Y-%m-%d %H:%M:%S")
-        .map(|dt| {
-            dt.date()
-                .format_localized("%a %d %b", Locale::en_US)
-                .to_string()
-        })
+        .map(|dt| dt.date().format_localized("%a %d %b", locale).to_string())
         .unwrap_or_else(|_| "Unknown".to_string());
 
     let mut out = String::new();
 
-    out.push_str(&color::header(&format!("Weather Report: {}", location)));
+    out.push_str(&color::header(&format!(
+        "{}: {}",
+        lang.weather_report(),
+        location
+    )));
     out.push('\n');
     out.push_str(&format!("{}\n", first_date));
     out.push('\n');
@@ -124,10 +128,11 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
     ));
     // Line 3: wind speed (no cardinal)
     out.push_str(&format!(
-        "     {}  {} {:.0} km/h\n",
+        "     {}  {} {:.0} {}\n",
         color::weather_icon_line(icon[2], first_code),
         format_wind_dir_icon(wd_deg),
         ws as i64,
+        lang.wind_unit(),
     ));
     // Line 4: visibility (raw vs_text)
     out.push_str(&format!(
@@ -255,11 +260,7 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
             .first()
             .and_then(|s| s["local_datetime"].as_str())
             .and_then(|dt| NaiveDateTime::parse_from_str(dt, "%Y-%m-%d %H:%M:%S").ok())
-            .map(|dt| {
-                dt.date()
-                    .format_localized("%a %d %b", Locale::en_US)
-                    .to_string()
-            })
+            .map(|dt| dt.date().format_localized("%a %d %b", locale).to_string())
             .unwrap_or_else(|| "Unknown".to_string());
 
         let label = day_labels.get(g_idx).unwrap_or(&"");
@@ -290,7 +291,7 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
         let days_code = slots[0]["weather"].as_u64().unwrap_or(0) as u32;
 
         out.push_str(&format!(
-            "  {}  {}  {}-{}°C  {:.1} mm {}  {:.0}% avg\n",
+            "  {}  {}  {}-{}°C  {:.1} mm {}  {:.0}% {}\n",
             header,
             color::desc_text(first_desc, days_code),
             min_t,
@@ -298,6 +299,7 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
             total_rain,
             lang.total(),
             avg_humid,
+            lang.average_label(),
         ));
     }
 
