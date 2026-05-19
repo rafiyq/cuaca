@@ -12,6 +12,16 @@ pub enum OutputFormat {
     Json,
 }
 
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum ColorMode {
+    #[value(name = "auto")]
+    Auto,
+    #[value(name = "always")]
+    Always,
+    #[value(name = "never")]
+    Never,
+}
+
 #[derive(Parser, Debug)]
 #[command(
     name = "cuaca",
@@ -79,4 +89,12 @@ pub struct Args {
 
     #[arg(long, help = "Display temperature in Fahrenheit instead of Celsius")]
     pub fahrenheit: bool,
+
+    #[arg(
+        value_enum,
+        long,
+        default_value = "auto",
+        help = "ANSI color output: auto, always, or never"
+    )]
+    pub color: ColorMode,
 }

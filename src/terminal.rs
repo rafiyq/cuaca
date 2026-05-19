@@ -1,24 +1,10 @@
-use std::collections::{BTreeSet, HashMap};
-
 use chrono::{Locale, NaiveDateTime, Timelike};
 use serde_json::Value;
 
+use crate::color;
 use crate::constants::get_ascii_icon;
-use crate::format::{celsius_to_fahrenheit, format_temp};
-
-const VLINE: &str = "│";
-const HLINE: &str = "─";
-const TL: &str = "┌";
-const BL: &str = "└";
-const BR: &str = "┘";
-const LEFT_T: &str = "├";
-const RIGHT_T: &str = "┤";
-
-const HOUR_COL_WIDTH: usize = 6;
-const DAY_COL_WIDTH: usize = 30;
-const ICON_WIDTH: usize = 13;
-const DATA_WIDTH: usize = DAY_COL_WIDTH - ICON_WIDTH;
-const ICON_ROWS: usize = 5;
+use crate::format::celsius_to_fahrenheit;
+use crate::graphs::{sparkline_panel, temperature_panel};
 
 pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
     let lang = args.lang;
@@ -27,11 +13,14 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
     let lokasi = &weather["lokasi"];
     let provinsi = lokasi["provinsi"].as_str().unwrap_or("");
     let kotkab = lokasi["kotkab"].as_str().unwrap_or("");
-    let location = if !kotkab.is_empty() {
-        format!("{}, {}", kotkab, provinsi)
-    } else {
-        provinsi.to_string()
-    };
+    let kecamatan = lokasi["kecamatan"].as_str().unwrap_or("");
+    let desa = lokasi["desa"].as_str().unwrap_or("");
+
+    let location_parts: Vec<&str> = vec![desa, kecamatan, kotkab, provinsi]
+        .into_iter()
+        .filter(|p| !p.is_empty())
+        .collect();
+    let location = location_parts.join(", ");
 
     let cuaca_groups = match weather["data"]
         .as_array()
@@ -42,16 +31,27 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
         None => return "No forecast data available".to_string(),
     };
 
-    let all_slots: Vec<&Value> = cuaca_groups
+    let all_slots: Vec<(usize, &Value)> = cuaca_groups
         .iter()
-        .flat_map(|g| g.as_array().map_or(vec![], |s| s.iter().collect()))
+        .enumerate()
+        .flat_map(|(g_idx, g)| {
+            g.as_array().map_or(vec![], |s| {
+                s.iter().map(move |slot| (g_idx, slot)).collect()
+            })
+        })
         .collect();
 
     if all_slots.is_empty() {
         return "No forecast data available".to_string();
     }
 
-    let first_slot = all_slots[0];
+    let today_slots: Vec<&Value> = cuaca_groups
+        .first()
+        .and_then(|g| g.as_array())
+        .map(|s| s.iter().collect())
+        .unwrap_or_default();
+
+    let first_slot = all_slots[0].1;
     let weather_desc_key = lang.weather_desc_key();
     let desc = first_slot[weather_desc_key].as_str().unwrap_or("?");
     let temp_c = first_slot["t"].as_i64().unwrap_or(0);
@@ -66,193 +66,297 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
     let wd_cardinal = first_slot["wd"].as_str().unwrap_or("?");
     let tp = first_slot["tp"].as_f64().unwrap_or(0.0);
     let vs_text = first_slot["vs_text"].as_str().unwrap_or("?");
-
-    let mut out = String::new();
+    let hu = first_slot["hu"].as_i64().unwrap_or(0);
 
     let first_code = first_slot["weather"].as_u64().unwrap_or(0) as u32;
     let icon = get_ascii_icon(first_code);
-    let feels_like_c = first_slot["t"].as_i64().unwrap_or(0);
-    let feels_like = if fahrenheit {
-        celsius_to_fahrenheit(feels_like_c)
-    } else {
-        feels_like_c
-    };
 
-    out.push_str(&format!("Weather report: {}\n", location));
+    let first_dt = first_slot["local_datetime"].as_str().unwrap_or("");
+    let first_date = NaiveDateTime::parse_from_str(first_dt, "%Y-%m-%d %H:%M:%S")
+        .map(|dt| {
+            dt.date()
+                .format_localized("%a %d %b", Locale::en_US)
+                .to_string()
+        })
+        .unwrap_or_else(|_| "Unknown".to_string());
+
+    let mut out = String::new();
+
+    out.push_str(&color::header(&format!("Weather Report: {}", location)));
+    out.push('\n');
+    out.push_str(&format!("{}\n", first_date));
+    out.push('\n');
     out.push('\n');
 
-    out.push_str(&format!("                {}\n", desc));
-    out.push_str(&format!("{}  +{}({}) °C\n", icon[0], temp, feels_like));
+    let unit = if fahrenheit { "°F" } else { "°C" };
+
     out.push_str(&format!(
-        "{}  {} {} {} km/h\n",
-        icon[1],
+        "     {}   {}\n",
+        color::weather_icon_line(icon[0], first_code),
+        color::desc_text(desc, first_code),
+    ));
+    out.push_str(&format!(
+        "     {}  {}{}{}\n",
+        color::weather_icon_line(icon[1], first_code),
+        temp,
+        if temp >= 0 { "+" } else { "" },
+        unit,
+    ));
+    out.push_str(&format!(
+        "     {}  {} {} {} km/h   {}   {:.1} mm   {}%\n",
+        color::weather_icon_line(icon[2], first_code),
         format_wind_dir_icon(wd_deg),
         wd_cardinal,
-        ws as i64
+        ws as i64,
+        vs_text,
+        tp,
+        hu,
     ));
-    out.push_str(&format!("{}  {}\n", icon[2], vs_text));
-    out.push_str(&format!("                {} mm\n", tp));
+    out.push_str(&format!(
+        "     {}\n",
+        color::weather_icon_line(icon[3], first_code)
+    ));
+    out.push_str(&format!(
+        "     {}\n",
+        color::weather_icon_line(icon[4], first_code)
+    ));
+    out.push('\n');
 
-    let locale = Locale::en_US;
-    let day_labels = [lang.today(), lang.tomorrow(), lang.day_after_tomorrow()];
-
-    let mut all_hours: BTreeSet<String> = BTreeSet::new();
-    let mut day_data: Vec<HashMap<String, &Value>> = Vec::new();
-
-    for group in cuaca_groups.iter() {
-        let slots: Vec<&Value> = group.as_array().map_or(vec![], |s| s.iter().collect());
-        let mut day_map = HashMap::new();
-        for slot in slots {
-            let hour = extract_hour(slot["local_datetime"].as_str());
-            if let Some(ref h) = hour {
-                all_hours.insert(h.clone());
-                day_map.insert(h.clone(), slot);
-            }
-        }
-        day_data.push(day_map);
-    }
-
-    let day_headers: Vec<String> = cuaca_groups
+    let temps: Vec<f64> = today_slots
         .iter()
-        .enumerate()
-        .map(|(i, g)| {
-            let slots: Vec<&Value> = g.as_array().map_or(vec![], |s| s.iter().collect());
-            let date_str = slots
-                .first()
-                .and_then(|s| s["local_datetime"].as_str())
-                .and_then(|dt| NaiveDateTime::parse_from_str(dt, "%Y-%m-%d %H:%M:%S").ok())
-                .map(|dt| dt.date().format_localized("%a %d %b", locale).to_string())
-                .unwrap_or_else(|| "Unknown".to_string());
-            let label = day_labels.get(i).unwrap_or(&"");
-            if !label.is_empty() {
-                format!("{}, {}", label, date_str)
+        .map(|s| {
+            let t = s["t"].as_f64().unwrap_or(0.0);
+            if fahrenheit {
+                celsius_to_fahrenheit(t as i64) as f64
             } else {
-                date_str
+                t
+            }
+        })
+        .collect();
+    let rains: Vec<f64> = today_slots
+        .iter()
+        .map(|s| s["tp"].as_f64().unwrap_or(0.0))
+        .collect();
+    let humids: Vec<f64> = today_slots
+        .iter()
+        .map(|s| s["hu"].as_f64().unwrap_or(0.0))
+        .collect();
+    let winds: Vec<f64> = today_slots
+        .iter()
+        .map(|s| s["ws"].as_f64().unwrap_or(0.0))
+        .collect();
+    let clouds: Vec<f64> = today_slots
+        .iter()
+        .map(|s| s["tcc"].as_f64().unwrap_or(0.0))
+        .collect();
+
+    let vis_vals: Vec<f64> = today_slots
+        .iter()
+        .map(|s| {
+            s["vs_text"]
+                .as_str()
+                .and_then(|v| {
+                    v.split_whitespace()
+                        .find_map(|token| token.parse::<f64>().ok())
+                })
+                .unwrap_or(0.0)
+        })
+        .collect();
+
+    let times: Vec<String> = today_slots
+        .iter()
+        .map(|s| {
+            let dt_str = s["local_datetime"].as_str().unwrap_or("");
+            if let Ok(dt) = NaiveDateTime::parse_from_str(dt_str, "%Y-%m-%d %H:%M:%S") {
+                format!("{:02}", dt.hour())
+            } else if let Ok(dt) = NaiveDateTime::parse_from_str(dt_str, "%Y-%m-%dT%H:%M:%S") {
+                format!("{:02}", dt.hour())
+            } else if dt_str.len() >= 13 {
+                let h = &dt_str[11..13];
+                if h.parse::<u32>().is_ok() {
+                    h.to_string()
+                } else {
+                    "??".to_string()
+                }
+            } else {
+                "??".to_string()
             }
         })
         .collect();
 
-    let num_days = day_headers.len();
+    let mut temp_rows = temperature_panel(&temps, &times);
+    eprintln!("DEBUG: temp_rows len = {}", temp_rows.len());
+    let mut rain_rows = sparkline_panel(&rains, &times);
+    let mut humid_rows = sparkline_panel(&humids, &times);
+    let mut wind_rows = sparkline_panel(&winds, &times);
+    let mut cloud_rows = sparkline_panel(&clouds, &times);
+    let mut vis_rows = sparkline_panel(&vis_vals, &times);
 
+    colorize_temp_panel(&mut temp_rows, &temps);
+    colorize_spark_panel(&mut rain_rows, color::rain_bar);
+    colorize_spark_panel(&mut humid_rows, color::humid_spark);
+    colorize_spark_panel(&mut wind_rows, color::wind_spark);
+    colorize_spark_panel(&mut cloud_rows, color::cloud_bar);
+    colorize_spark_panel(&mut vis_rows, color::vis_spark);
+
+    render_row(
+        &mut out,
+        &lang.temperature(),
+        &temp_rows,
+        &lang.rainfall(),
+        &rain_rows,
+        &lang.humidity_label(),
+        &humid_rows,
+    );
     out.push('\n');
-    out.push_str(TL);
-    out.push_str(&" ".repeat(HOUR_COL_WIDTH));
-    for header in &day_headers {
-        out.push_str(VLINE);
-        out.push_str(&format!("{:^DAY_COL_WIDTH$}", header));
-    }
-    out.push_str(VLINE);
+    render_row(
+        &mut out,
+        &lang.wind_label(),
+        &wind_rows,
+        &lang.cloud_label(),
+        &cloud_rows,
+        &lang.visibility_label(),
+        &vis_rows,
+    );
     out.push('\n');
 
-    out.push_str(LEFT_T);
-    out.push_str(&HLINE.repeat(HOUR_COL_WIDTH));
-    for _ in 0..num_days {
-        out.push_str(VLINE);
-        out.push_str(&HLINE.repeat(DAY_COL_WIDTH));
-    }
-    out.push_str(RIGHT_T);
-    out.push('\n');
-
-    let hours: Vec<&String> = all_hours.iter().collect();
-    for (hour_idx, hour) in hours.iter().enumerate() {
-        for row_idx in 0..ICON_ROWS {
-            if row_idx == 0 {
-                out.push_str(VLINE);
-                out.push_str(&format!("{:^HOUR_COL_WIDTH$}", hour));
-            } else {
-                out.push_str(VLINE);
-                out.push_str(&" ".repeat(HOUR_COL_WIDTH));
-            }
-            for day_idx in 0..num_days {
-                out.push_str(VLINE);
-                if let Some(slot) = day_data.get(day_idx).and_then(|d| d.get(*hour)) {
-                    let icon = get_ascii_icon(slot["weather"].as_u64().unwrap_or(0) as u32);
-                    let icon_line = icon[row_idx];
-                    let data = get_cell_data(slot, row_idx, lang.weather_desc_key(), fahrenheit);
-                    out.push_str(&format!("{:<ICON_WIDTH$}{:<DATA_WIDTH$}", icon_line, data));
-                } else {
-                    out.push_str(&" ".repeat(DAY_COL_WIDTH));
-                }
-            }
-            out.push_str(VLINE);
-            out.push('\n');
+    let day_labels = [lang.today(), lang.tomorrow(), lang.day_after_tomorrow()];
+    for (g_idx, group) in cuaca_groups.iter().enumerate() {
+        let slots: Vec<&Value> = group.as_array().map_or(vec![], |s| s.iter().collect());
+        if slots.is_empty() {
+            continue;
         }
 
-        if hour_idx < hours.len() - 1 {
-            out.push_str(LEFT_T);
-            out.push_str(&HLINE.repeat(HOUR_COL_WIDTH));
-            for _ in 0..num_days {
-                out.push_str(VLINE);
-                out.push_str(&HLINE.repeat(DAY_COL_WIDTH));
-            }
-            out.push_str(RIGHT_T);
-            out.push('\n');
-        }
+        let date_str = slots
+            .first()
+            .and_then(|s| s["local_datetime"].as_str())
+            .and_then(|dt| NaiveDateTime::parse_from_str(dt, "%Y-%m-%d %H:%M:%S").ok())
+            .map(|dt| {
+                dt.date()
+                    .format_localized("%a %d %b", Locale::en_US)
+                    .to_string()
+            })
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        let label = day_labels.get(g_idx).unwrap_or(&"");
+        let header = if !label.is_empty() {
+            format!("{}, {}", label, date_str)
+        } else {
+            date_str.clone()
+        };
+
+        let day_temps: Vec<i64> = slots.iter().map(|s| s["t"].as_i64().unwrap_or(0)).collect();
+        let min_t = day_temps.iter().min().copied().unwrap_or(0);
+        let max_t = day_temps.iter().max().copied().unwrap_or(0);
+        let total_rain: f64 = slots.iter().map(|s| s["tp"].as_f64().unwrap_or(0.0)).sum();
+        let avg_humid: f64 = {
+            let sum: i64 = slots.iter().map(|s| s["hu"].as_i64().unwrap_or(0)).sum();
+            sum as f64 / slots.len() as f64
+        };
+
+        let desc_key = lang.weather_desc_key();
+        let first_desc = slots[0][desc_key].as_str().unwrap_or("?");
+
+        let (min_t, max_t) = if fahrenheit {
+            (celsius_to_fahrenheit(min_t), celsius_to_fahrenheit(max_t))
+        } else {
+            (min_t, max_t)
+        };
+
+        let days_code = slots[0]["weather"].as_u64().unwrap_or(0) as u32;
+
+        out.push_str(&format!(
+            "  {}  {}  {}-{}°C  {:.1} mm {}  {:.0}% avg\n",
+            header,
+            color::desc_text(first_desc, days_code),
+            min_t,
+            max_t,
+            total_rain,
+            lang.total(),
+            avg_humid,
+        ));
     }
 
-    out.push_str(BL);
-    out.push_str(&HLINE.repeat(HOUR_COL_WIDTH));
-    for _ in 0..num_days {
-        out.push_str(VLINE);
-        out.push_str(&HLINE.repeat(DAY_COL_WIDTH));
-    }
-    out.push_str(BR);
     out.push('\n');
-
+    out.push_str(&color::dim(lang.source()));
     out.push('\n');
-    out.push_str(&format!("{}\n", lang.source()));
 
     out
 }
 
-fn get_cell_data(slot: &Value, row: usize, desc_key: &str, fahrenheit: bool) -> String {
-    match row {
-        0 => {
-            let desc = slot[desc_key].as_str().unwrap_or("?");
-            let max = DATA_WIDTH.saturating_sub(1);
-            if desc.len() > max {
-                format!("{}…", &desc[..max.saturating_sub(1)])
-            } else {
-                desc.to_string()
-            }
+fn render_row(
+    out: &mut String,
+    title1: &str,
+    panel1: &[String],
+    title2: &str,
+    panel2: &[String],
+    title3: &str,
+    panel3: &[String],
+) {
+    let title_field = |t: &str| -> String {
+        let t = if t.len() > 24 { &t[..24] } else { t };
+        let pad_left = 6;
+        let graph_w = 24;
+        let total_w = pad_left + graph_w;
+        let title_len = t.len();
+        let pad = if title_len >= graph_w {
+            0
+        } else {
+            (graph_w - title_len) / 2
+        };
+        let mut field = " ".repeat(pad_left + pad);
+        field.push_str(t);
+        let remaining = total_w - field.len();
+        if remaining > 0 {
+            field.push_str(&" ".repeat(remaining));
         }
-        1 => {
-            let temp_c = slot["t"].as_i64().unwrap_or(0);
-            let temp = if fahrenheit {
-                celsius_to_fahrenheit(temp_c)
-            } else {
-                temp_c
-            };
-            format_temp(temp)
-        }
-        2 => {
-            let wd_deg = slot["wd_deg"].as_i64().unwrap_or(0);
-            let wd_cardinal = slot["wd"].as_str().unwrap_or("?");
-            let ws = slot["ws"].as_f64().unwrap_or(0.0);
-            format!(
-                "{} {} {} km/h",
-                format_wind_dir_icon(wd_deg),
-                wd_cardinal,
-                ws as i64
-            )
-        }
-        3 => {
-            let vs = slot["vs_text"].as_str().unwrap_or("?");
-            vs.to_string()
-        }
-        4 => {
-            let tp = slot["tp"].as_f64().unwrap_or(0.0);
-            let hu = slot["hu"].as_i64().unwrap_or(0);
-            format!("{:.1}mm | {}%", tp, hu)
-        }
-        _ => String::new(),
+        field
+    };
+
+    out.push_str(&format!(
+        "{}  {}  {}\n",
+        title_field(title1),
+        title_field(title2),
+        title_field(title3)
+    ));
+
+    let max_h = panel1.len().max(panel2.len()).max(panel3.len());
+    for r in 0..max_h {
+        let l1 = panel1
+            .get(r)
+            .map(|s| format!("{:<30}", s))
+            .unwrap_or_else(|| " ".repeat(30));
+        let l2 = panel2
+            .get(r)
+            .map(|s| format!("{:<30}", s))
+            .unwrap_or_else(|| " ".repeat(30));
+        let l3 = panel3
+            .get(r)
+            .map(|s| format!("{:<30}", s))
+            .unwrap_or_else(|| " ".repeat(30));
+        out.push_str(&format!("{}  {}  {}\n", l1, l2, l3));
     }
 }
 
-fn extract_hour(local_datetime: Option<&str>) -> Option<String> {
-    local_datetime
-        .and_then(|s| NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").ok())
-        .map(|dt| format!("{:02}:{:02}", dt.hour(), dt.minute()))
+fn colorize_temp_panel(rows: &mut Vec<String>, temps: &[f64]) {
+    let min_t = temps.iter().cloned().fold(f64::INFINITY, f64::min);
+    let max_t = temps.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+
+    for i in 0..rows.len() {
+        let rev_i = rows.len() - 1 - i;
+        let temp_at_row = if rows.len() <= 1 {
+            25.0
+        } else {
+            min_t + (max_t - min_t) * (rev_i as f64 / (rows.len() - 1) as f64)
+        };
+        rows[i] = color::temp_line(&rows[i], temp_at_row as i64);
+    }
+}
+
+fn colorize_spark_panel(rows: &mut Vec<String>, color_fn: fn(&str) -> String) {
+    for i in 0..rows.len() {
+        rows[i] = color_fn(&rows[i]);
+    }
 }
 
 fn format_wind_dir_icon(degrees: i64) -> &'static str {

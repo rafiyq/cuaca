@@ -85,4 +85,53 @@ impl Lang {
             Self::ID => "weather_desc",
         }
     }
+
+    pub fn temperature(&self) -> &'static str {
+        match self {
+            Self::EN => "TEMPERATURE",
+            Self::ID => "SUHU",
+        }
+    }
+
+    pub fn rainfall(&self) -> &'static str {
+        match self {
+            Self::EN => "RAINFALL (mm)",
+            Self::ID => "HUJAN (mm)",
+        }
+    }
+
+    pub fn humidity_label(&self) -> &'static str {
+        match self {
+            Self::EN => "HUMIDITY (%)",
+            Self::ID => "KELEMBABAN (%)",
+        }
+    }
+
+    pub fn wind_label(&self) -> &'static str {
+        match self {
+            Self::EN => "WIND (km/h)",
+            Self::ID => "ANGIN (km/h)",
+        }
+    }
+
+    pub fn cloud_label(&self) -> &'static str {
+        match self {
+            Self::EN => "CLOUD COVER (%)",
+            Self::ID => "AWAN (%)",
+        }
+    }
+
+    pub fn visibility_label(&self) -> &'static str {
+        match self {
+            Self::EN => "VISIBILITY",
+            Self::ID => "JARAK PANDANG",
+        }
+    }
+
+    pub fn total(&self) -> &'static str {
+        match self {
+            Self::EN => "total",
+            Self::ID => "total",
+        }
+    }
 }

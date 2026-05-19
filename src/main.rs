@@ -20,8 +20,10 @@ use crate::format::{
 };
 
 mod cli;
+mod color;
 mod constants;
 mod format;
+mod graphs;
 mod lang;
 mod terminal;
 
@@ -171,6 +173,7 @@ fn resolve_adm4(args: &Args) -> String {
 
 fn main() {
     let args = Args::parse();
+    color::set_color_mode(args.color);
     let lang = args.lang;
 
     let adm4 = resolve_adm4(&args);
