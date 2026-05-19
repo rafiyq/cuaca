@@ -48,7 +48,15 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
     // Use the first 8 chronological slots for the column charts (may span multiple days)
     let chart_slots: Vec<&Value> = all_slots.iter().take(8).map(|(_, slot)| *slot).collect();
 
+    // First hour's slot (needed for header info and max temp)
     let first_slot = all_slots[0].1;
+
+    // Today's slots (first day) for computing max temperature
+    let today_slots: Vec<&Value> = cuaca_groups
+        .first()
+        .and_then(|g| g.as_array())
+        .map(|s| s.iter().collect())
+        .unwrap_or_default();
     let weather_desc_key = lang.weather_desc_key();
     let desc = first_slot[weather_desc_key].as_str().unwrap_or("?");
     let temp_c = first_slot["t"].as_i64().unwrap_or(0);
@@ -60,13 +68,27 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
 
     let ws = first_slot["ws"].as_f64().unwrap_or(0.0);
     let wd_deg = first_slot["wd_deg"].as_i64().unwrap_or(0);
-    let wd_cardinal = first_slot["wd"].as_str().unwrap_or("?");
     let tp = first_slot["tp"].as_f64().unwrap_or(0.0);
     let vs_text = first_slot["vs_text"].as_str().unwrap_or("?");
-    let hu = first_slot["hu"].as_i64().unwrap_or(0);
 
     let first_code = first_slot["weather"].as_u64().unwrap_or(0) as u32;
     let icon = get_ascii_icon(first_code);
+
+    // Compute max temperature for today (for display in parentheses)
+    let max_temp_c: f64 = if today_slots.is_empty() {
+        temp_c as f64
+    } else {
+        today_slots
+            .iter()
+            .filter_map(|s| s["t"].as_f64())
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap_or(temp_c as f64)
+    };
+    let max_temp = if fahrenheit {
+        celsius_to_fahrenheit(max_temp_c as i64)
+    } else {
+        max_temp_c as i64
+    };
 
     let first_dt = first_slot["local_datetime"].as_str().unwrap_or("");
     let first_date = NaiveDateTime::parse_from_str(first_dt, "%Y-%m-%d %H:%M:%S")
@@ -87,35 +109,37 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
 
     let unit = if fahrenheit { "°F" } else { "°C" };
 
+    // Line 1: description
     out.push_str(&format!(
         "     {}   {}\n",
         color::weather_icon_line(icon[0], first_code),
         color::desc_text(desc, first_code),
     ));
+    // Line 2: temperature with max in parentheses
+    let temp_str = format!("{:+}({}) {}", temp, max_temp, unit);
     out.push_str(&format!(
-        "     {}  {}{}{}\n",
+        "     {}  {}\n",
         color::weather_icon_line(icon[1], first_code),
-        temp,
-        if temp >= 0 { "+" } else { "" },
-        unit,
+        temp_str,
     ));
+    // Line 3: wind speed (no cardinal)
     out.push_str(&format!(
-        "     {}  {} {} {} km/h   {}   {:.1} mm   {}%\n",
+        "     {}  {} {:.0} km/h\n",
         color::weather_icon_line(icon[2], first_code),
         format_wind_dir_icon(wd_deg),
-        wd_cardinal,
         ws as i64,
+    ));
+    // Line 4: visibility (raw vs_text)
+    out.push_str(&format!(
+        "     {}  {}\n",
+        color::weather_icon_line(icon[3], first_code),
         vs_text,
+    ));
+    // Line 5: precipitation
+    out.push_str(&format!(
+        "     {}  {:.1} mm\n",
+        color::weather_icon_line(icon[4], first_code),
         tp,
-        hu,
-    ));
-    out.push_str(&format!(
-        "     {}\n",
-        color::weather_icon_line(icon[3], first_code)
-    ));
-    out.push_str(&format!(
-        "     {}\n",
-        color::weather_icon_line(icon[4], first_code)
     ));
     out.push('\n');
 
