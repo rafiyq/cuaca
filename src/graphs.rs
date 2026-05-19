@@ -25,7 +25,6 @@ fn nice_ticks(min_val: f64, max_val: f64, steps: usize) -> Vec<f64> {
         10.0 * magnitude
     };
 
-    // Compute starting tick such that we cover min_val and max_val with exactly `steps` ticks
     let mut tick_start = (min_val / nice_step).floor() * nice_step;
     let tick_end = tick_start + nice_step * (steps as f64 - 1.0);
 
@@ -36,7 +35,6 @@ fn nice_ticks(min_val: f64, max_val: f64, steps: usize) -> Vec<f64> {
     (0..steps)
         .map(|i| {
             let v = tick_start + i as f64 * nice_step;
-            // Round to nearest multiple of nice_step to avoid floating point artifacts
             (v / nice_step).round() * nice_step
         })
         .collect()
@@ -106,7 +104,6 @@ fn time_axis(times: &[String], width: usize) -> String {
 
 const SPARKLINE_CHARS: &[char] = &['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 const PANEL_GRAPH_W: usize = 24;
-const PANEL_GRAPH_H: usize = 4;
 
 fn sparkline(values: &[f64]) -> String {
     if values.is_empty() {
@@ -133,8 +130,8 @@ fn sparkline(values: &[f64]) -> String {
         .collect()
 }
 
-pub fn temperature_panel(values: &[f64], times: &[String]) -> Vec<String> {
-    if values.len() < 2 {
+pub fn temperature_panel(values: &[f64], times: &[String], height: usize) -> Vec<String> {
+    if values.len() < 2 || height < 2 {
         return vec![];
     }
 
@@ -146,11 +143,7 @@ pub fn temperature_panel(values: &[f64], times: &[String]) -> Vec<String> {
 
     let min_val = clipped.iter().cloned().fold(f64::INFINITY, f64::min);
     let max_val = clipped.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-    let range = if (max_val - min_val).abs() < f64::EPSILON {
-        1.0
-    } else {
-        max_val - min_val
-    };
+    let range = max_val - min_val;
 
     let braille_h = 4;
 
@@ -218,15 +211,15 @@ pub fn temperature_panel(values: &[f64], times: &[String]) -> Vec<String> {
 
     let mut rows = Vec::new();
 
-    for row_idx in 0..PANEL_GRAPH_H {
-        let factor = (PANEL_GRAPH_H - 1 - row_idx) as f64 / (PANEL_GRAPH_H - 1) as f64;
+    for row_idx in 0..height {
+        let factor = (height - 1 - row_idx) as f64 / (height - 1) as f64;
         let val_at_row = min_val + factor * range;
         let num_str = format!("{:.0}°", val_at_row.round() as i64);
         let label = format!("{:>5}", num_str);
 
         let mut row = label;
         row.push(' ');
-        if row_idx == PANEL_GRAPH_H / 2 {
+        if row_idx == height / 2 {
             row.push_str(&stretched_braille);
         } else {
             row.push_str(&" ".repeat(PANEL_GRAPH_W));
@@ -243,15 +236,14 @@ pub fn temperature_panel(values: &[f64], times: &[String]) -> Vec<String> {
     rows
 }
 
-pub fn sparkline_panel(values: &[f64], times: &[String]) -> Vec<String> {
-    if values.is_empty() {
+pub fn sparkline_panel(values: &[f64], times: &[String], height: usize) -> Vec<String> {
+    if values.is_empty() || height < 2 {
         return vec![];
     }
 
     let sl = sparkline(values);
     let clipped_times: Vec<String> = times.iter().take(PANEL_GRAPH_W).cloned().collect();
 
-    let h = PANEL_GRAPH_H;
     let stretched = stretch_to_width(&sl, PANEL_GRAPH_W);
 
     let min = values.iter().cloned().fold(f64::INFINITY, f64::min);
@@ -259,14 +251,14 @@ pub fn sparkline_panel(values: &[f64], times: &[String]) -> Vec<String> {
     let range = max - min;
 
     let mut rows = Vec::new();
-    for row_idx in 0..h {
-        let factor = (h - 1 - row_idx) as f64 / (h - 1) as f64;
+    for row_idx in 0..height {
+        let factor = (height - 1 - row_idx) as f64 / (height - 1) as f64;
         let val_at_row = min + factor * range;
         let label = format!("{:>5.1}", val_at_row);
 
         let mut row = label;
         row.push(' ');
-        if row_idx == h / 2 {
+        if row_idx == height / 2 {
             row.push_str(&stretched);
         } else {
             row.push_str(&" ".repeat(PANEL_GRAPH_W));
@@ -313,12 +305,12 @@ mod tests {
 
     #[test]
     fn temperature_panel_empty() {
-        assert!(temperature_panel(&[], &[]).is_empty());
+        assert!(temperature_panel(&[], &[], 4).is_empty());
     }
 
     #[test]
     fn temperature_panel_single_value() {
-        assert!(temperature_panel(&[25.0], &["20:00".to_string()]).is_empty());
+        assert!(temperature_panel(&[25.0], &["20:00".to_string()], 4).is_empty());
     }
 
     #[test]
@@ -332,9 +324,10 @@ mod tests {
                 "05".into(),
                 "08".into(),
             ],
+            4,
         );
         assert!(!rows.is_empty());
-        assert_eq!(rows.len(), PANEL_GRAPH_H + 1);
+        assert_eq!(rows.len(), 4 + 1); // height + time axis
     }
 
     #[test]
@@ -342,9 +335,10 @@ mod tests {
         let rows = sparkline_panel(
             &[60.0, 70.0, 80.0, 90.0],
             &["20".into(), "23".into(), "02".into(), "05".into()],
+            4,
         );
         assert!(!rows.is_empty());
-        assert_eq!(rows.len(), PANEL_GRAPH_H + 1);
+        assert_eq!(rows.len(), 4 + 1);
     }
 
     #[test]
@@ -352,9 +346,10 @@ mod tests {
         let rows = sparkline_panel(
             &[10.0, 20.0, 30.0],
             &["20".into(), "23".into(), "02".into()],
+            4,
         );
         let first_label = rows[0].trim();
-        let last_label = rows[PANEL_GRAPH_H - 1].trim();
+        let last_label = rows[3].trim(); // PANEL_GRAPH_H-1 = 3
         assert!(first_label.starts_with("30"));
         assert!(last_label.starts_with("10"));
     }

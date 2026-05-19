@@ -91,6 +91,13 @@ pub struct Args {
     pub fahrenheit: bool,
 
     #[arg(
+        long,
+        default_value = "4",
+        help = "Number of Y-axis tick labels per panel (3-6)"
+    )]
+    pub yticks: usize,
+
+    #[arg(
         value_enum,
         long,
         default_value = "auto",

@@ -184,13 +184,14 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
         })
         .collect();
 
-    let mut temp_rows = temperature_panel(&temps, &times);
-    eprintln!("DEBUG: temp_rows len = {}", temp_rows.len());
-    let mut rain_rows = sparkline_panel(&rains, &times);
-    let mut humid_rows = sparkline_panel(&humids, &times);
-    let mut wind_rows = sparkline_panel(&winds, &times);
-    let mut cloud_rows = sparkline_panel(&clouds, &times);
-    let mut vis_rows = sparkline_panel(&vis_vals, &times);
+    let height = args.yticks.clamp(3, 6);
+
+    let mut temp_rows = temperature_panel(&temps, &times, height);
+    let mut rain_rows = sparkline_panel(&rains, &times, height);
+    let mut humid_rows = sparkline_panel(&humids, &times, height);
+    let mut wind_rows = sparkline_panel(&winds, &times, height);
+    let mut cloud_rows = sparkline_panel(&clouds, &times, height);
+    let mut vis_rows = sparkline_panel(&vis_vals, &times, height);
 
     colorize_temp_panel(&mut temp_rows, &temps);
     colorize_spark_panel(&mut rain_rows, color::rain_bar);
