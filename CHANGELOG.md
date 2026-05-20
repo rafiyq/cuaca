@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Polygon‑based alert matching with fallback to area name.
+- `--warnings-ttl MINUTES` flag to configure cache TTL (default 15).
+- Tooltip shows warning validity period (HH:MM–HH:MM) and infographic link.
+
 ## [0.2.1] - 2026-05-20
 
 ### Added
@@ -28,9 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
- - Icons are no longer double‑wrapped with color codes.
- - ANSI codes are stripped in no‑color mode.
- - Tooltip now properly escapes Pango markup to avoid blank rendering.
+- Icons are no longer double‑wrapped with color codes.
+- ANSI codes are stripped in no‑color mode.
+- Tooltip now properly escapes Pango markup to avoid blank rendering.
 
 ## [0.2.0] - 2026-05-20
 
