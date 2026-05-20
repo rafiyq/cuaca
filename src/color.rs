@@ -122,3 +122,10 @@ pub fn header(text: &str) -> String {
 pub fn dim(text: &str) -> String {
     paint(text, "\x1b[2m")
 }
+
+pub fn warning(text: &str) -> String {
+    if !is_color() {
+        return text.to_string();
+    }
+    paint(text, "\x1b[38;5;226m") // bright yellow
+}

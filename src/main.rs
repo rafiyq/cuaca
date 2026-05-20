@@ -28,6 +28,7 @@ mod format;
 mod graphs;
 mod lang;
 mod terminal;
+mod warnings;
 
 fn cache_dir() -> PathBuf {
     std::env::temp_dir()
@@ -267,6 +268,14 @@ fn main() {
         exit(1);
     }
 
+    // Fetch warnings if requested
+    let warnings_list = if args.warnings {
+        let province = lokasi["provinsi"].as_str().unwrap_or("");
+        warnings::fetch_warnings(province, args.lang)
+    } else {
+        vec![]
+    };
+
     let first_slot = all_slots[0];
     let weather_code = first_slot["weather"].as_u64().unwrap_or(0) as u32;
     let weather_icon = get_weather_icon(weather_code, args.nerd);
@@ -437,6 +446,15 @@ fn main() {
         tooltip += &line;
     }
 
+    // Append weather warnings if any
+    if !warnings_list.is_empty() {
+        tooltip += "<b>Weather Warnings:</b>\n";
+        for w in &warnings_list {
+            tooltip += &format!("• {}<br/>\n", w.headline);
+        }
+        tooltip += "\n";
+    }
+
     tooltip += &format!("\n<small>{}</small>", lang.source());
 
     data.insert("tooltip", tooltip);
@@ -457,7 +475,7 @@ fn main() {
             println!("{}", json_data);
         }
         OutputFormat::Text => {
-            let output = terminal::render_terminal(&weather, &args);
+            let output = terminal::render_terminal(&weather, &args, &warnings_list);
             println!("{}", output);
         }
         OutputFormat::Json => {

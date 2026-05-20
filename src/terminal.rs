@@ -5,8 +5,13 @@ use crate::color;
 use crate::constants::get_ascii_icon;
 use crate::format::celsius_to_fahrenheit;
 use crate::graphs::column_chart_panel;
+use crate::warnings;
 
-pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
+pub fn render_terminal(
+    weather: &Value,
+    args: &crate::cli::Args,
+    warnings: &[warnings::Warning],
+) -> String {
     let lang = args.lang;
     let fahrenheit = args.fahrenheit;
     let locale = match lang {
@@ -110,6 +115,14 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
     out.push_str(&format!("{}\n", first_date));
     out.push('\n');
     out.push('\n');
+
+    // Render active weather warnings, if any
+    if !warnings.is_empty() {
+        for w in warnings {
+            out.push_str(&format!("     ⚠️  {}\n", color::warning(&w.headline)));
+        }
+        out.push('\n'); // blank line after warnings block
+    }
 
     let unit = if fahrenheit { "°F" } else { "°C" };
 

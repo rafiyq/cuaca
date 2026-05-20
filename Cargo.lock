@@ -168,6 +168,7 @@ dependencies = [
  "js-sys",
  "num-traits",
  "pure-rust-locales",
+ "serde",
  "wasm-bindgen",
  "windows-link",
 ]
@@ -264,10 +265,11 @@ dependencies = [
 
 [[package]]
 name = "cuaca"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "clap",
+ "quick-xml",
  "reqwest",
  "serde",
  "serde_json",
@@ -892,6 +894,16 @@ name = "pure-rust-locales"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "869675ad2d7541aea90c6d88c81f46a7f4ea9af8cd0395d38f11a95126998a0d"
+
+[[package]]
+name = "quick-xml"
+version = "0.31.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1004a344b30a54e2ee58d66a71b32d2db2feb0a31f9a2d302bf0536f15de2a33"
+dependencies = [
+ "memchr",
+ "serde",
+]
 
 [[package]]
 name = "quinn"

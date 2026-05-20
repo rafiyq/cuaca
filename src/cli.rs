@@ -90,6 +90,9 @@ pub struct Args {
     #[arg(long, help = "Display temperature in Fahrenheit instead of Celsius")]
     pub fahrenheit: bool,
 
+    #[arg(long, help = "Include BMKG weather warnings (nowcasts)")]
+    pub warnings: bool,
+
     #[arg(
         long,
         default_value = "4",
