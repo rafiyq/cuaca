@@ -9,37 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  ### Added
 
- - BMKG nowcast weather warnings via `--warnings` flag (province‑level matching, 5‑minute caching).
+ - BMKG nowcast weather warnings via `--warnings` flag (province‑level matching, 15‑minute RSS TTL, per‑alert caching).
  - Colored ASCII weather icons with 256‑color support.
  - Wider column chart bars with fixed 8‑slot time axis, spanning multiple days.
  - Localized headers and dates based on language (EN/ID).
  - Indonesian translations for wind unit (km/j), average label (rata-rata), and total (Jumlah).
 
- ### Changed
+  ### Changed
 
- - Cache strategy: all caches now respect `CUACA_CACHE_DIR` and store under `$CUACA_CACHE_DIR/cuaca` subdirectory (default `$TEMP/cuaca`).
- - Warnings cache uses per‑alert files and 15‑minute RSS TTL for efficiency.
- - Temperature panel title now includes unit (°C/°F).
- - Visibility panel title now includes unit (km).
- - Wind speed formatting uses localized unit.
- - Day summary line now displays total rain label and average humidity label per language.
+  - Cache strategy: all caches now respect `CUACA_CACHE_DIR` and store under `$CUACA_CACHE_DIR/cuaca` subdirectory (default `$TEMP/cuaca`).
+  - Warnings cache uses per‑alert files and 15‑minute RSS TTL for efficiency.
+  - Temperature panel title now includes unit (°C/°F).
+  - Visibility panel title now includes unit (km).
+  - Wind speed formatting uses localized unit.
+  - Day summary line now displays total rain label and average humidity label per language.
 
- ### Fixed
+  ### Fixed
 
- - Icons are no longer double‑wrapped with color codes.
- - ANSI codes are stripped in no‑color mode.
-
-### Changed
-
-- Temperature panel title now includes unit (°C/°F).
-- Visibility panel title now includes unit (km).
-- Wind speed formatting uses localized unit.
-- Day summary line now displays total rain label and average humidity label per language.
-
-### Fixed
-
-- Icons are no longer double‑wrapped with color codes.
-- ANSI codes are stripped in no‑color mode.
+  - Icons are no longer double‑wrapped with color codes.
+  - ANSI codes are stripped in no‑color mode.
 
 ## [0.1.0] - 2026-05-17
 
