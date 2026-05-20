@@ -28,9 +28,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+ - Icons are no longer double‑wrapped with color codes.
+ - ANSI codes are stripped in no‑color mode.
+ - Tooltip now properly escapes Pango markup to avoid blank rendering.
+
+## [0.2.0] - 2026-05-20
+
+### Added
+
+- Colored ASCII weather icons with 256‑color support.
+- Wider column chart bars with fixed 8‑slot time axis, spanning multiple days.
+- Localized headers and dates based on language (EN/ID).
+- Indonesian translations for wind unit (km/j), average label (rata-rata), and total (Jumlah).
+
+### Changed
+
+- Temperature panel title now includes unit (°C/°F).
+- Visibility panel title now includes unit (km).
+- Wind speed formatting uses localized unit.
+- Day summary line now displays total rain label and average humidity label per language.
+
+### Fixed
+
 - Icons are no longer double‑wrapped with color codes.
 - ANSI codes are stripped in no‑color mode.
-- Tooltip now properly escapes Pango markup to avoid blank rendering.
 
 ## [0.1.0] - 2026-05-17
 
