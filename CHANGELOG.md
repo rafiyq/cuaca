@@ -7,12 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.0] - 2026-05-20
 
-### Added
+ ### Added
 
-- Colored ASCII weather icons with 256‑color support.
-- Wider column chart bars with fixed 8‑slot time axis, spanning multiple days.
-- Localized headers and dates based on language (EN/ID).
-- Indonesian translations for wind unit (km/j), average label (rata-rata), and total (Jumlah).
+ - BMKG nowcast weather warnings integration via `--warnings` flag, with province-level matching and 5‑minute caching.
+ - Colored ASCII weather icons with 256‑color support.
+ - Wider column chart bars with fixed 8‑slot time axis, spanning multiple days.
+ - Localized headers and dates based on language (EN/ID).
+ - Indonesian translations for wind unit (km/j), average label (rata-rata), and total (Jumlah).
 
 ### Changed
 
