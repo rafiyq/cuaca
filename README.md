@@ -14,13 +14,21 @@ Compile yourself using `cargo build --release`, or download a precompiled binary
 - `--date-format FMT` - strftime format for dates [default: `%Y-%m-%d`]
 - `--ampm` - display time in AM/PM format
 - `--nerd` - use nerd font symbols instead of emojis
-- `--hide-details` - show shorter per-slot lines (hide cloud cover, precipitation, and visibility)
+ - `--hide-details` - show shorter per-slot lines (hide cloud cover, precipitation, and visibility)
+ - `--warnings` - include BMKG nowcast weather warnings
+ - `--warnings-ttl MINUTES` - warnings cache TTL in minutes (default: 15)
 
-Example:
+ Example:
 
-```
-cuaca --adm4 31.71.03.1001 --ampm --hide-details
-```
+ ```
+ cuaca --adm4 31.71.03.1001 --ampm --hide-details
+ ```
+
+ ## Weather Warnings
+
+ With the `--warnings` flag, cuaca fetches BMKG nowcast weather warnings ( CAP XML ) that affect your location. Matching is performed using precise polygon containment when the alert defines a polygon; otherwise the province name is used as fallback. The tooltip will show each warning's validity period (HH:MM–HH:MM) and a link to the BMKG infographic. Warnings are cached per‑alert for 15 minutes (configurable via `--warnings-ttl`) to respect rate limits.
+
+ Note: The tooltip properly escapes visibility values like `< 8 km` to avoid rendering issues.
 
 ## Waybar configuration
 
