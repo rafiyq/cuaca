@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+use crate::cache::cache_dir;
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Warning {
     pub headline: String,
@@ -56,6 +58,34 @@ struct Area {
     area_desc: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct RssCache {
+    fetched_at: DateTime<Utc>,
+    items: Vec<ItemCacheEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ItemCacheEntry {
+    link: String,
+    // Store identifier derived from link (last path component without extension)
+    id: String,
+    expires: Option<DateTime<Utc>>, // optional: we keep CAP's expires for quick check
+}
+
+fn warnings_cache_dir() -> PathBuf {
+    cache_dir().join("warnings")
+}
+
+fn rss_cache_path() -> PathBuf {
+    warnings_cache_dir().join("rss.json")
+}
+
+fn alert_cache_path(id: &str) -> PathBuf {
+    warnings_cache_dir()
+        .join("alerts")
+        .join(format!("{}.json", id))
+}
+
 fn parse_rss(xml: &[u8]) -> Result<RssFeed, Box<dyn std::error::Error>> {
     let mut deserializer = Deserializer::from_reader(xml);
     let feed = RssFeed::deserialize(&mut deserializer)?;
@@ -66,16 +96,6 @@ fn parse_cap(xml: &[u8]) -> Result<CapAlert, Box<dyn std::error::Error>> {
     let mut deserializer = Deserializer::from_reader(xml);
     let alert = CapAlert::deserialize(&mut deserializer)?;
     Ok(alert)
-}
-
-fn cache_path() -> PathBuf {
-    std::env::temp_dir().join("cuaca-warnings.json")
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct WarningsCache {
-    fetched_at: DateTime<Utc>,
-    alerts: Vec<Warning>,
 }
 
 fn filter_by_province(mut alerts: Vec<Warning>, province: &str) -> Vec<Warning> {
@@ -90,43 +110,130 @@ fn filter_by_province(mut alerts: Vec<Warning>, province: &str) -> Vec<Warning> 
     alerts
 }
 
+/// Extract a stable ID from the CAP link URL, e.g., ".../CBT20260520001_alert.xml" -> "CBT20260520001"
+fn cap_id_from_link(link: &str) -> String {
+    let path = std::path::Path::new(link);
+    let fname = match path.file_name().and_then(|s| s.to_str()) {
+        Some(s) => s,
+        None => return link.to_string(),
+    };
+    if fname.ends_with("_alert.xml") {
+        fname.trim_end_matches("_alert.xml").to_string()
+    } else if let Some(dot) = fname.rfind('.') {
+        fname[..dot].to_string()
+    } else {
+        fname.to_string()
+    }
+}
+
 pub fn fetch_warnings(province: &str, lang: crate::lang::Lang) -> Vec<Warning> {
-    // Attempt to load fresh cache (5 minutes)
-    let cache_file = cache_path();
-    if let Ok(data) = fs::read(&cache_file) {
-        if let Ok(cache) = serde_json::from_slice::<WarningsCache>(&data) {
-            if (Utc::now() - cache.fetched_at) < Duration::minutes(5) {
-                return filter_by_province(cache.alerts.clone(), province);
+    // Ensure cache directory exists
+    let warn_dir = warnings_cache_dir();
+    let _ = fs::create_dir_all(&warn_dir);
+    let alerts_dir = warn_dir.join("alerts");
+    let _ = fs::create_dir_all(&alerts_dir);
+
+    // RSS cache TTL: 15 minutes
+    let rss_path = rss_cache_path();
+    let rss_fresh = if let Ok(meta) = fs::metadata(&rss_path) {
+        if let Ok(modified) = meta.modified() {
+            let modified_dt: DateTime<Utc> = modified.into();
+            let rss_age = Utc::now().signed_duration_since(modified_dt);
+            rss_age < Duration::minutes(15)
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+
+    let rss_items: Vec<ItemCacheEntry> = if rss_fresh {
+        if let Ok(data) = fs::read(&rss_path) {
+            if let Ok(cache) = serde_json::from_slice::<RssCache>(&data) {
+                cache.items
+            } else {
+                vec![]
+            }
+        } else {
+            vec![]
+        }
+    } else {
+        // Fresh fetch
+        let rss_url = match lang {
+            crate::lang::Lang::EN => "https://www.bmkg.go.id/alerts/nowcast/en",
+            crate::lang::Lang::ID => "https://www.bmkg.go.id/alerts/nowcast/id",
+        };
+        let client = Client::new();
+        let rss_resp = match client.get(rss_url).send() {
+            Ok(resp) => resp,
+            Err(_) => return vec![],
+        };
+        let rss_bytes = match rss_resp.bytes() {
+            Ok(b) => b,
+            Err(_) => return vec![],
+        };
+        let rss_feed = match parse_rss(&rss_bytes) {
+            Ok(feed) => feed,
+            Err(_) => return vec![],
+        };
+        let mut entries = Vec::new();
+        for item in rss_feed.channel.item {
+            if let Some(ref link) = item.link {
+                let id = cap_id_from_link(link);
+                entries.push(ItemCacheEntry {
+                    link: link.clone(),
+                    id,
+                    expires: None, // we'll determine per CAP
+                });
             }
         }
-    }
-
-    // Fetch fresh data
-    let rss_url = match lang {
-        crate::lang::Lang::EN => "https://www.bmkg.go.id/alerts/nowcast/en",
-        crate::lang::Lang::ID => "https://www.bmkg.go.id/alerts/nowcast/id",
-    };
-    let client = Client::new();
-    let rss_resp = match client.get(rss_url).send() {
-        Ok(resp) => resp,
-        Err(_) => return vec![],
-    };
-    let rss_bytes = match rss_resp.bytes() {
-        Ok(b) => b,
-        Err(_) => return vec![],
-    };
-    let items = match parse_rss(&rss_bytes) {
-        Ok(feed) => feed.channel.item,
-        Err(_) => return vec![],
-    };
-
-    let mut alerts = Vec::new();
-    for item in items {
-        let link = match item.link {
-            Some(ref l) => l,
-            None => continue,
+        // Save RSS cache
+        let cache = RssCache {
+            fetched_at: Utc::now(),
+            items: entries.clone(),
         };
-        let cap_resp = match client.get(link).send() {
+        let _ = fs::create_dir_all(warn_dir);
+        if let Ok(mut file) = fs::File::create(&rss_path) {
+            let _ = serde_json::to_writer_pretty(&mut file, &cache);
+        }
+        entries
+    };
+
+    // For each item, load or fetch the CAP
+    let mut alerts = Vec::new();
+    let client = Client::new();
+    let now = Utc::now();
+    for entry in rss_items {
+        let cap_path = alert_cache_path(&entry.id);
+        // Check if cached CAP is still valid based on its own expires
+        let can_use_cached = if let Ok(meta) = fs::metadata(&cap_path) {
+            if let Ok(modified) = meta.modified() {
+                // If we have recorded expires, check; otherwise fallback to age (e.g., 1 hour)
+                if let Some(exp) = entry.expires {
+                    now < exp
+                } else {
+                    let modified_dt: DateTime<Utc> = modified.into();
+                    let age = now.signed_duration_since(modified_dt);
+                    age < Duration::hours(1)
+                }
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        if can_use_cached {
+            if let Ok(data) = fs::read(&cap_path) {
+                if let Ok(warn) = serde_json::from_slice::<Warning>(&data) {
+                    alerts.push(warn);
+                    continue;
+                }
+            }
+        }
+
+        // Fetch CAP
+        let cap_resp = match client.get(&entry.link).send() {
             Ok(resp) => resp,
             Err(_) => continue,
         };
@@ -134,26 +241,24 @@ pub fn fetch_warnings(province: &str, lang: crate::lang::Lang) -> Vec<Warning> {
             Ok(b) => b,
             Err(_) => continue,
         };
-        if let Ok(cap) = parse_cap(&cap_bytes) {
-            let info = cap.info;
-            let effective = parse_iso(&info.effective);
-            let expires = parse_iso(&info.expires);
-            alerts.push(Warning {
-                headline: info.headline,
-                area_desc: info.area.area_desc,
-                effective,
-                expires,
-            });
+        let cap = match parse_cap(&cap_bytes) {
+            Ok(cap) => cap,
+            Err(_) => continue,
+        };
+        let info = cap.info;
+        let effective = parse_iso(&info.effective);
+        let expires = parse_iso(&info.expires);
+        let warning = Warning {
+            headline: info.headline,
+            area_desc: info.area.area_desc,
+            effective,
+            expires,
+        };
+        // Cache it
+        if let Ok(mut file) = fs::File::create(&cap_path) {
+            let _ = serde_json::to_writer_pretty(&mut file, &warning);
         }
-    }
-
-    // Save to cache
-    let cache = WarningsCache {
-        fetched_at: Utc::now(),
-        alerts: alerts.clone(),
-    };
-    if let Ok(mut file) = fs::File::create(&cache_file) {
-        let _ = serde_json::to_writer_pretty(&mut file, &cache);
+        alerts.push(warning);
     }
 
     filter_by_province(alerts, province)
@@ -168,6 +273,15 @@ fn parse_iso(s: &str) -> Option<DateTime<Utc>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_cap_id_from_link() {
+        assert_eq!(
+            cap_id_from_link("https://www.bmkg.go.id/alerts/nowcast/id/CBT20260520001_alert.xml"),
+            "CBT20260520001"
+        );
+        assert_eq!(cap_id_from_link("https://example.com/foo.xml"), "foo");
+    }
 
     #[test]
     fn test_parse_cap_sample() {

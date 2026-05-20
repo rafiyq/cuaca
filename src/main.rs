@@ -19,8 +19,10 @@ use crate::format::{
     get_weather_icon,
 };
 
+use crate::cache::cache_dir;
 use crate::lang::Lang;
 
+mod cache;
 mod cli;
 mod color;
 mod constants;
@@ -29,10 +31,6 @@ mod graphs;
 mod lang;
 mod terminal;
 mod warnings;
-
-fn cache_dir() -> PathBuf {
-    std::env::temp_dir()
-}
 
 fn error_json(text: &str, tooltip: &str) -> String {
     format!("{{\"text\":\"{}\", \"tooltip\":\"{}\"}}", text, tooltip)
