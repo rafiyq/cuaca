@@ -15,19 +15,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_cache_dir_uses_env() {
-        env::set_var("CUACA_CACHE_DIR", "/tmp/custom-cache");
-        let dir = cache_dir();
-        assert_eq!(dir, PathBuf::from("/tmp/custom-cache"));
-        env::remove_var("CUACA_CACHE_DIR");
-    }
+    fn test_cache_dir() {
+        // Save previous state
+        let prev = env::var("CUACA_CACHE_DIR").ok();
 
-    #[test]
-    fn test_cache_dir_default() {
-        // Ensure env var is not set
+        // When env set
+        env::set_var("CUACA_CACHE_DIR", "/tmp/custom-cache");
+        assert_eq!(cache_dir(), PathBuf::from("/tmp/custom-cache"));
+
+        // When env not set (default)
         env::remove_var("CUACA_CACHE_DIR");
-        let dir = cache_dir();
-        // Should be temp_dir() / "cuaca"
-        assert_eq!(dir, env::temp_dir().join("cuaca"));
+        assert_eq!(cache_dir(), env::temp_dir().join("cuaca"));
+
+        // Restore previous state
+        match prev {
+            Some(val) => env::set_var("CUACA_CACHE_DIR", val),
+            None => env::remove_var("CUACA_CACHE_DIR"),
+        }
     }
 }

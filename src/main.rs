@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::fs::{metadata, read_to_string, File};
+use std::fs::{create_dir_all, metadata, read_to_string, File};
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::exit;
@@ -21,6 +21,13 @@ use crate::format::{
 
 use crate::cache::cache_dir;
 use crate::lang::Lang;
+
+/// Escape Pango markup special characters: &, <, >
+fn escape_pango(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
 
 mod cache;
 mod cli;
@@ -302,11 +309,9 @@ fn main() {
         first_temp
     };
 
-    let mut tooltip = format!(
-        "<b>{}</b> {}\u{00b0}\n",
-        first_slot[weather_desc_key].as_str().unwrap_or("?"),
-        display_temp,
-    );
+    let first_desc = first_slot[weather_desc_key].as_str().unwrap_or("?");
+    let escaped_first_desc = escape_pango(first_desc);
+    let mut tooltip = format!("<b>{}</b> {}\u{00b0}\n", &escaped_first_desc, display_temp,);
 
     tooltip += &format!(
         "{}: {}%\n",
@@ -333,7 +338,7 @@ fn main() {
     );
 
     let vs_text = first_slot["vs_text"].as_str().unwrap_or("?");
-    tooltip += &format!("{}: {}\n", lang.visibility(), vs_text);
+    tooltip += &format!("{}: {}\n", lang.visibility(), escape_pango(vs_text));
 
     let provinsi = lokasi["provinsi"].as_str().unwrap_or("");
     let kotkab = lokasi["kotkab"].as_str().unwrap_or("");
@@ -345,7 +350,11 @@ fn main() {
         .filter(|p| !p.is_empty())
         .collect();
 
-    tooltip += &format!("{}: {}\n", lang.location(), location_parts.join(", "));
+    tooltip += &format!(
+        "{}: {}\n",
+        lang.location(),
+        escape_pango(&location_parts.join(", "))
+    );
 
     let locale = match lang {
         Lang::EN => Locale::en_US,
@@ -417,7 +426,7 @@ fn main() {
             format_time(local_dt, args.ampm),
             get_weather_icon(slot["weather"].as_u64().unwrap_or(0) as u32, args.nerd),
             format_temp(temp),
-            desc,
+            escape_pango(desc),
             format_wind_dir_icon(wd_val, args.nerd),
             ws_val,
             lang.wind_unit(),
@@ -436,7 +445,12 @@ fn main() {
 
             line += &format!(
                 "  {} {}%  {} {} mm  {} {}",
-                cloud_icon, tcc_val, rain_icon, tp_val, eye_icon, vs_val
+                cloud_icon,
+                tcc_val,
+                rain_icon,
+                tp_val,
+                eye_icon,
+                escape_pango(vs_val)
             );
         }
 
@@ -448,7 +462,7 @@ fn main() {
     if !warnings_list.is_empty() {
         tooltip += "<b>Weather Warnings:</b>\n";
         for w in &warnings_list {
-            tooltip += &format!("• {}<br/>\n", w.headline);
+            tooltip += &format!("• {}<br/>\n", escape_pango(&w.headline));
         }
         tooltip += "\n";
     }
@@ -515,6 +529,12 @@ fn fetch_weather(
 }
 
 fn save_cache(cachefile: &PathBuf, weather: &Value) {
+    if let Some(parent) = cachefile.parent() {
+        create_dir_all(parent).unwrap_or_else(|_| {
+            eprintln!("Unable to create cache directory at {}", parent.display());
+            exit(1);
+        });
+    }
     let mut file = File::create(cachefile).unwrap_or_else(|_| {
         eprintln!("Unable to create cache file at {}", cachefile.display());
         exit(1);
