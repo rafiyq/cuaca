@@ -92,19 +92,7 @@ GPS resolutions are cached to `cache_dir()/cuaca-gps.json` (24h TTL) to avoid re
 ### Phase 4 — Distribution
 
 - [ ] AUR package (PKGBUILD)
-- [x] Multi-platform CI: Linux (x86_64, aarch64), macOS (x86_64, aarch64), Windows (x86_64)
-- [x] Auto-release on tag push
+ - [x] Multi-platform CI: Linux (x86_64, aarch64), macOS (x86_64, aarch64), Windows (x86_64)
+ - [x] Auto-release on tag push
 
-## Changelog
-
-### v0.1.0
-
-- Initial implementation
-- Multi-platform builds (Linux, macOS, Windows)
-- Auto-release on git tag push
-- 13 unit tests, zero clippy warnings
-- EN/ID support, 14 weather codes, emoji + nerd font icons
-- Custom indicator expressions, 10-min caching, exp backoff retry
-- Cross-platform cache paths, Day 3 label, mutual `--lat`/`--lon` validation
-- `--fahrenheit` temperature conversion
-- Graceful cache corruption handling with API fallback
+See `CHANGELOG.md` for version history.
