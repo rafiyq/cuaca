@@ -12,32 +12,18 @@ use reqwest::blocking::Client;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::cli::{Args, OutputFormat};
-use crate::constants::{CLOUD_COVER_ICON, ERROR_ICON, PRECIPITATION_ICON, VISIBILITY_ICON};
-use crate::format::{
+use cuaca::cache::cache_dir;
+use cuaca::cli::{Args, OutputFormat};
+use cuaca::color;
+use cuaca::constants::{CLOUD_COVER_ICON, ERROR_ICON, PRECIPITATION_ICON, VISIBILITY_ICON};
+use cuaca::format::{
     celsius_to_fahrenheit, format_indicator, format_temp, format_time, format_wind_dir_icon,
     get_weather_icon,
 };
-
-use crate::cache::cache_dir;
-use crate::lang::Lang;
-
-/// Escape Pango markup special characters: &, <, >
-fn escape_pango(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-}
-
-mod cache;
-mod cli;
-mod color;
-mod constants;
-mod format;
-mod graphs;
-mod lang;
-mod terminal;
-mod warnings;
+use cuaca::lang::Lang;
+use cuaca::terminal;
+use cuaca::util::escape_pango;
+use cuaca::warnings;
 
 fn error_json(text: &str, tooltip: &str) -> String {
     format!("{{\"text\":\"{}\", \"tooltip\":\"{}\"}}", text, tooltip)
