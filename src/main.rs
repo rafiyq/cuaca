@@ -6,7 +6,7 @@ use std::process::exit;
 use std::thread;
 use std::time::{Duration, SystemTime};
 
-use chrono::{Locale, NaiveDateTime};
+use chrono::{DateTime, Locale, NaiveDateTime, Utc};
 use clap::Parser;
 use reqwest::blocking::Client;
 use serde::Deserialize;
@@ -261,8 +261,10 @@ fn main() {
 
     // Fetch warnings if requested
     let warnings_list = if args.warnings {
-        let province = lokasi["provinsi"].as_str().unwrap_or("");
-        warnings::fetch_warnings(province, args.lang)
+        let province = weather["lokasi"]["provinsi"].as_str().unwrap_or("");
+        let lat = weather["lokasi"]["lat"].as_f64().unwrap_or(0.0);
+        let lon = weather["lokasi"]["lon"].as_f64().unwrap_or(0.0);
+        warnings::fetch_warnings(province, args.lang, lat, lon, args.warnings_ttl)
     } else {
         vec![]
     };
@@ -448,7 +450,18 @@ fn main() {
     if !warnings_list.is_empty() {
         tooltip += "<b>Weather Warnings:</b>\n";
         for w in &warnings_list {
-            tooltip += &format!("• {}<br/>\n", escape_pango(&w.headline));
+            // Validity times: HH:MM–HH:MM (24‑hour, local)
+            let times = if let (Some(e), Some(x)) = (&w.effective, (&w.expires)) {
+                let fmt = |dt: &DateTime<Utc>| dt.format("%H:%M").to_string();
+                format!("Valid: {}–{}\n", fmt(e), fmt(x))
+            } else {
+                "".to_string()
+            };
+            tooltip += &format!("• <b>{}<br/>{}", escape_pango(&w.headline), times);
+            if let Some(web) = &w.web {
+                tooltip += &format!("<a href=\"{}\">Infographic</a>", escape_pango(web));
+            }
+            tooltip += "</br>\n";
         }
         tooltip += "\n";
     }

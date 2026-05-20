@@ -7,12 +7,45 @@ use std::path::PathBuf;
 
 use crate::cache::cache_dir;
 
+fn parse_polygon(s: &str) -> Vec<(f64, f64)> {
+    s.split_whitespace()
+        .filter_map(|coord| {
+            let parts: Vec<&str> = coord.split(',').collect();
+            if parts.len() == 2 {
+                let lat = parts[0].parse::<f64>().ok()?;
+                let lon = parts[1].parse::<f64>().ok()?;
+                Some((lat, lon))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn point_in_polygon(point: (f64, f64), poly: &[(f64, f64)]) -> bool {
+    let (x, y) = point;
+    let mut inside = false;
+    let mut j = poly.len() - 1;
+    for i in 0..poly.len() {
+        let (xi, yi) = poly[i];
+        let (xj, yj) = poly[j];
+        let intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+        if intersect {
+            inside = !inside;
+        }
+        j = i;
+    }
+    inside
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Warning {
     pub headline: String,
     pub area_desc: String,
     pub effective: Option<DateTime<Utc>>,
     pub expires: Option<DateTime<Utc>>,
+    pub polygons: Vec<Vec<(f64, f64)>>,
+    pub web: Option<String>,
 }
 
 // RSS feed structures
@@ -49,6 +82,7 @@ struct Info {
     effective: String,
     expires: String,
     area: Area,
+    web: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -56,20 +90,20 @@ struct Info {
 struct Area {
     #[serde(rename = "areaDesc")]
     area_desc: String,
+    #[serde(rename = "polygon")]
+    polygons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ItemCacheEntry {
+    link: String,
+    id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct RssCache {
     fetched_at: DateTime<Utc>,
     items: Vec<ItemCacheEntry>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct ItemCacheEntry {
-    link: String,
-    // Store identifier derived from link (last path component without extension)
-    id: String,
-    expires: Option<DateTime<Utc>>, // optional: we keep CAP's expires for quick check
 }
 
 fn warnings_cache_dir() -> PathBuf {
@@ -126,20 +160,26 @@ fn cap_id_from_link(link: &str) -> String {
     }
 }
 
-pub fn fetch_warnings(province: &str, lang: crate::lang::Lang) -> Vec<Warning> {
+pub fn fetch_warnings(
+    province: &str,
+    lang: crate::lang::Lang,
+    lat: f64,
+    lon: f64,
+    ttl_minutes: u64,
+) -> Vec<Warning> {
     // Ensure cache directory exists
     let warn_dir = warnings_cache_dir();
     let _ = fs::create_dir_all(&warn_dir);
     let alerts_dir = warn_dir.join("alerts");
     let _ = fs::create_dir_all(&alerts_dir);
 
-    // RSS cache TTL: 15 minutes
+    // RSS cache TTL: configurable
     let rss_path = rss_cache_path();
     let rss_fresh = if let Ok(meta) = fs::metadata(&rss_path) {
         if let Ok(modified) = meta.modified() {
             let modified_dt: DateTime<Utc> = modified.into();
             let rss_age = Utc::now().signed_duration_since(modified_dt);
-            rss_age < Duration::minutes(15)
+            rss_age < Duration::minutes(ttl_minutes as i64)
         } else {
             false
         }
@@ -183,7 +223,6 @@ pub fn fetch_warnings(province: &str, lang: crate::lang::Lang) -> Vec<Warning> {
                 entries.push(ItemCacheEntry {
                     link: link.clone(),
                     id,
-                    expires: None, // we'll determine per CAP
                 });
             }
         }
@@ -203,31 +242,29 @@ pub fn fetch_warnings(province: &str, lang: crate::lang::Lang) -> Vec<Warning> {
     let mut alerts = Vec::new();
     let client = Client::new();
     let now = Utc::now();
+    let fallback_ttl = Duration::minutes(ttl_minutes as i64);
     for entry in rss_items {
         let cap_path = alert_cache_path(&entry.id);
-        // Check if cached CAP is still valid based on its own expires
-        let can_use_cached = if let Ok(meta) = fs::metadata(&cap_path) {
-            if let Ok(modified) = meta.modified() {
-                // If we have recorded expires, check; otherwise fallback to age (e.g., 1 hour)
-                if let Some(exp) = entry.expires {
-                    now < exp
+        // Try to use cached CAP if it exists and is still valid
+        if let Ok(data) = fs::read(&cap_path) {
+            if let Ok(warn) = serde_json::from_slice::<Warning>(&data) {
+                // Check if still valid: either not expired or within fallback TTL
+                if let Some(exp) = warn.expires {
+                    if now < exp {
+                        alerts.push(warn);
+                        continue;
+                    }
                 } else {
-                    let modified_dt: DateTime<Utc> = modified.into();
-                    let age = now.signed_duration_since(modified_dt);
-                    age < Duration::hours(1)
-                }
-            } else {
-                false
-            }
-        } else {
-            false
-        };
-
-        if can_use_cached {
-            if let Ok(data) = fs::read(&cap_path) {
-                if let Ok(warn) = serde_json::from_slice::<Warning>(&data) {
-                    alerts.push(warn);
-                    continue;
+                    if let Ok(meta) = fs::metadata(&cap_path) {
+                        if let Ok(modified) = meta.modified() {
+                            let modified_dt: DateTime<Utc> = modified.into();
+                            let age = now.signed_duration_since(modified_dt);
+                            if age < fallback_ttl {
+                                alerts.push(warn);
+                                continue;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -248,11 +285,20 @@ pub fn fetch_warnings(province: &str, lang: crate::lang::Lang) -> Vec<Warning> {
         let info = cap.info;
         let effective = parse_iso(&info.effective);
         let expires = parse_iso(&info.expires);
+        let mut polygons = Vec::new();
+        for p in info.area.polygons {
+            let pts = parse_polygon(&p);
+            if !pts.is_empty() {
+                polygons.push(pts);
+            }
+        }
         let warning = Warning {
             headline: info.headline,
             area_desc: info.area.area_desc,
             effective,
             expires,
+            polygons,
+            web: info.web,
         };
         // Cache it
         if let Ok(mut file) = fs::File::create(&cap_path) {
@@ -261,7 +307,29 @@ pub fn fetch_warnings(province: &str, lang: crate::lang::Lang) -> Vec<Warning> {
         alerts.push(warning);
     }
 
-    filter_by_province(alerts, province)
+    // Polygon-based filtering with fallback to area name and time validity
+    let point = (lat, lon);
+    let mut filtered: Vec<Warning> = alerts
+        .iter()
+        .filter(|w| {
+            !w.polygons.is_empty() && w.polygons.iter().any(|poly| point_in_polygon(point, poly))
+        })
+        .cloned()
+        .collect();
+
+    if filtered.is_empty() {
+        filtered = alerts.clone();
+        let province_lower = province.to_ascii_lowercase();
+        filtered.retain(|w| w.area_desc.to_ascii_lowercase().contains(&province_lower));
+        let now = Utc::now();
+        filtered.retain(|w| {
+            let eff = w.effective.unwrap_or(now);
+            let exp = w.expires.unwrap_or(now + Duration::days(1));
+            now >= eff && now < exp
+        });
+    }
+
+    filtered
 }
 
 fn parse_iso(s: &str) -> Option<DateTime<Utc>> {
@@ -313,7 +381,7 @@ mod tests {
     <contact>06221 196</contact>
     <area>
       <areaDesc>Banten</areaDesc>
-      <polygon>-6.024,106.412 -6.031,106.408</polygon>
+      <polygon>-6.024,106.412 -6.031,106.408 -6.030,106.384</polygon>
     </area>
   </info>
 </alert>"#;
@@ -322,5 +390,23 @@ mod tests {
         assert_eq!(alert.info.headline, "Hujan Lebat disertai Petir di Banten");
         assert_eq!(alert.info.area.area_desc, "Banten");
         assert!(parse_iso(&alert.info.effective).is_some());
+        assert!(!alert.info.area.polygons.is_empty());
+        assert!(alert.info.web.is_some());
+    }
+
+    #[test]
+    fn test_point_in_polygon() {
+        let square = vec![(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)];
+        assert!(point_in_polygon((5.0, 5.0), &square));
+        assert!(!point_in_polygon((15.0, 5.0), &square));
+        // edge: point on edge may be considered inside? Our algorithm works for strict interior; it's fine.
+    }
+
+    #[test]
+    fn test_parse_polygon() {
+        let s = " -6.024,106.412 -6.031,106.408 -6.030,106.384 ";
+        let pts = parse_polygon(s);
+        assert_eq!(pts.len(), 3);
+        assert_eq!(pts[0], (-6.024, 106.412));
     }
 }

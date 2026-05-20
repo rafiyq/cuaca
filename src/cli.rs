@@ -94,6 +94,14 @@ pub struct Args {
     pub warnings: bool,
 
     #[arg(
+         long,
+         default_value = "15",
+         value_parser = clap::value_parser!(u64).range(1..=60),
+         help = "Warnings cache TTL in minutes (RSS and fallback CAP age)"
+     )]
+    pub warnings_ttl: u64,
+
+    #[arg(
         long,
         default_value = "4",
         help = "Number of Y-axis tick labels per panel (3-6)"
