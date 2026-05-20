@@ -228,9 +228,16 @@ pub fn render_terminal(weather: &Value, args: &crate::cli::Args) -> String {
     colorize_spark_panel(&mut cloud_rows, color::cloud_bar);
     colorize_spark_panel(&mut vis_rows, color::vis_spark);
 
+    // Compute temperature title with unit
+    let temp_title = if fahrenheit {
+        format!("{} (°F)", lang.temperature_base())
+    } else {
+        format!("{} (°C)", lang.temperature_base())
+    };
+
     render_row(
         &mut out,
-        &lang.temperature(),
+        &temp_title,
         &temp_rows,
         &lang.rainfall(),
         &rain_rows,

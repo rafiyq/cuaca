@@ -123,8 +123,15 @@ impl Lang {
 
     pub fn visibility_label(&self) -> &'static str {
         match self {
-            Self::EN => "VISIBILITY",
-            Self::ID => "JARAK PANDANG",
+            Self::EN => "VISIBILITY (km)",
+            Self::ID => "JARAK PANDANG (km)",
+        }
+    }
+
+    pub fn temperature_base(&self) -> &'static str {
+        match self {
+            Self::EN => "TEMPERATURE",
+            Self::ID => "SUHU",
         }
     }
 
