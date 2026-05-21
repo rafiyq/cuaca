@@ -252,19 +252,19 @@ pub fn render_terminal(
         &mut out,
         &temp_title,
         &temp_rows,
-        &lang.rainfall(),
+        lang.rainfall(),
         &rain_rows,
-        &lang.humidity_label(),
+        lang.humidity_label(),
         &humid_rows,
     );
     out.push('\n');
     render_row(
         &mut out,
-        &lang.wind_label(),
+        lang.wind_label(),
         &wind_rows,
-        &lang.cloud_label(),
+        lang.cloud_label(),
         &cloud_rows,
-        &lang.visibility_label(),
+        lang.visibility_label(),
         &vis_rows,
     );
     out.push('\n');
@@ -384,7 +384,7 @@ fn render_row(
     }
 }
 
-fn colorize_temp_panel(rows: &mut Vec<String>, temps: &[f64]) {
+fn colorize_temp_panel(rows: &mut [String], temps: &[f64]) {
     let min_t = temps.iter().cloned().fold(f64::INFINITY, f64::min);
     let max_t = temps.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
 
@@ -399,9 +399,9 @@ fn colorize_temp_panel(rows: &mut Vec<String>, temps: &[f64]) {
     }
 }
 
-fn colorize_spark_panel(rows: &mut Vec<String>, color_fn: fn(&str) -> String) {
-    for i in 0..rows.len() {
-        rows[i] = color_fn(&rows[i]);
+fn colorize_spark_panel(rows: &mut [String], color_fn: fn(&str) -> String) {
+    for row in rows {
+        *row = color_fn(row);
     }
 }
 

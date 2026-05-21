@@ -60,6 +60,7 @@ struct Channel {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct Item {
     title: Option<String>,
     link: Option<String>,
@@ -132,6 +133,7 @@ fn parse_cap(xml: &[u8]) -> Result<CapAlert, Box<dyn std::error::Error>> {
     Ok(alert)
 }
 
+#[allow(dead_code)]
 fn filter_by_province(mut alerts: Vec<Warning>, province: &str) -> Vec<Warning> {
     let province_lower = province.to_ascii_lowercase();
     alerts.retain(|w| w.area_desc.to_ascii_lowercase().contains(&province_lower));

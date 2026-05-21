@@ -274,21 +274,25 @@ fn main() {
     let weather_icon = get_weather_icon(weather_code, args.nerd);
     let weather_desc_key = lang.weather_desc_key();
 
-    let text = match &args.custom_indicator {
-        None => {
-            let temp_c = first_slot["t"].as_i64().unwrap_or(0);
-            let temp = if args.fahrenheit {
-                celsius_to_fahrenheit(temp_c)
-            } else {
-                temp_c
-            };
-            let indicator = format_temp(temp);
+    let temp_c = first_slot["t"].as_i64().unwrap_or(0);
+    let display_temp = if args.fahrenheit {
+        celsius_to_fahrenheit(temp_c)
+    } else {
+        temp_c
+    };
+    let unit = if args.fahrenheit { "°F" } else { "°C" };
 
+    let mut bar_text = match &args.custom_indicator {
+        None => {
+            let indicator = format_temp(display_temp);
             format!("{} {}", weather_icon, indicator)
         }
         Some(expression) => format_indicator(first_slot, expression, weather_icon),
     };
-    data.insert("text", text);
+    if args.warnings && !warnings_list.is_empty() {
+        bar_text = format!("⚠️ {}", bar_text);
+    }
+    data.insert("text", bar_text);
 
     let first_temp = first_slot["t"].as_i64().unwrap_or(0);
     let display_temp = if args.fahrenheit {
@@ -299,8 +303,31 @@ fn main() {
 
     let first_desc = first_slot[weather_desc_key].as_str().unwrap_or("?");
     let escaped_first_desc = escape_pango(first_desc);
-    let mut tooltip = format!("<b>{}</b> {}\u{00b0}\n", &escaped_first_desc, display_temp,);
 
+    // Compute location parts early
+    let provinsi = lokasi["provinsi"].as_str().unwrap_or("");
+    let kotkab = lokasi["kotkab"].as_str().unwrap_or("");
+    let kecamatan = lokasi["kecamatan"].as_str().unwrap_or("");
+    let desa = lokasi["desa"].as_str().unwrap_or("");
+    let location_parts: Vec<&str> = vec![desa, kecamatan, kotkab, provinsi]
+        .into_iter()
+        .filter(|p| !p.is_empty())
+        .collect();
+
+    // Build tooltip header: location first, separated by blank line, then description + temp + unit
+    let mut tooltip = String::new();
+    tooltip.push_str(&format!(
+        "<b>{}:</b> {}\n",
+        lang.weather_report(),
+        escape_pango(&location_parts.join(", "))
+    ));
+    tooltip.push('\n'); // blank line after title
+    tooltip.push_str(&format!(
+        "<b>{}</b> {} {}\n",
+        escaped_first_desc, display_temp, unit
+    ));
+
+    // Details
     tooltip += &format!(
         "{}: {}%\n",
         lang.humidity(),
@@ -328,21 +355,8 @@ fn main() {
     let vs_text = first_slot["vs_text"].as_str().unwrap_or("?");
     tooltip += &format!("{}: {}\n", lang.visibility(), escape_pango(vs_text));
 
-    let provinsi = lokasi["provinsi"].as_str().unwrap_or("");
-    let kotkab = lokasi["kotkab"].as_str().unwrap_or("");
-    let kecamatan = lokasi["kecamatan"].as_str().unwrap_or("");
-    let desa = lokasi["desa"].as_str().unwrap_or("");
-
-    let location_parts: Vec<&str> = vec![desa, kecamatan, kotkab, provinsi]
-        .into_iter()
-        .filter(|p| !p.is_empty())
-        .collect();
-
-    tooltip += &format!(
-        "{}: {}\n",
-        lang.location(),
-        escape_pango(&location_parts.join(", "))
-    );
+    // Blank line before warnings/day sections
+    tooltip.push('\n');
 
     let locale = match lang {
         Lang::EN => Locale::en_US,
@@ -369,7 +383,11 @@ fn main() {
     let mut current_group: Option<usize> = None;
     for (slot, group_idx) in &all_flat_slots {
         if current_group.is_none() || current_group != Some(*group_idx) {
-            tooltip += "\n<b>";
+            if *group_idx == 0 {
+                tooltip += "<b>";
+            } else {
+                tooltip += "\n<b>";
+            }
             current_group = Some(*group_idx);
 
             let local_dt = slot["local_datetime"]

@@ -70,6 +70,7 @@ const PANEL_GRAPH_W: usize = 24;
 /// - `times`: parallel time strings for X-axis (hours as strings like "09", "18", etc.)
 /// - `height`: number of rows (ticks) to display, between 3 and 6
 /// - `fmt`: format string for tick labels, e.g., "{:.0}°C" or "{:.1}"
+///
 /// Returns `height + 1` rows: 0=top label, ..., height-1=bottom label, height=time axis.
 pub fn column_chart_panel<F>(values: &[f64], times: &[String], height: usize, fmt: F) -> Vec<String>
 where
@@ -116,18 +117,20 @@ where
         // Fill the slot's columns: from col_start to col_start+slot_width-1 (clamped to width)
         let col_start = slot * slot_width;
         let col_end = cmp::min(col_start + slot_width, PANEL_GRAPH_W);
-        for r in row..height {
-            for c in col_start..col_end {
-                if r < height && c < PANEL_GRAPH_W {
-                    grid[r][c] = '█';
-                }
+        for grid_row in grid.iter_mut().skip(row).take(height - row) {
+            for ch in grid_row
+                .iter_mut()
+                .skip(col_start)
+                .take(col_end - col_start)
+            {
+                *ch = '█';
             }
         }
     }
 
     // Compute tick values for each row (top to bottom)
     let mut rows = Vec::new();
-    for row_idx in 0..height {
+    for (row_idx, _) in (0..height).enumerate() {
         let factor = (height - 1 - row_idx) as f64 / (height - 1) as f64;
         let tick_val = if height == 1 {
             min_val

@@ -78,7 +78,7 @@ fn strip_ansi(s: &str) -> String {
     while let Some(c) = chars.next() {
         if c == '\x1b' {
             // Skip until 'm' (inclusive)
-            while let Some(c2) = chars.next() {
+            for c2 in chars.by_ref() {
                 if c2 == 'm' {
                     break;
                 }
