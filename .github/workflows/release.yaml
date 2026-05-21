@@ -43,10 +43,17 @@ jobs:
           cp README.md dist/
           cp LICENSE dist/
           tar -czf "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz" -C dist .
+      - name: Generate checksum
+        run: |
+          pushd dist
+          sha256sum "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz" > "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz.sha256"
+          popd
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz"
+          files: |
+            cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz
+            cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz.sha256
           generate_release_notes: true
 
   macos:
@@ -82,10 +89,17 @@ jobs:
           cp README.md dist/
           cp LICENSE dist/
           tar -czf "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz" -C dist .
+      - name: Generate checksum
+        run: |
+          pushd dist
+          shasum -a 256 "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz" > "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz.sha256"
+          popd
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz"
+          files: |
+            cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz
+            cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz.sha256
           generate_release_notes: true
 
   windows:
@@ -108,8 +122,16 @@ jobs:
           Copy-Item README.md dist/
           Copy-Item LICENSE dist/
           Compress-Archive -Path "dist\cuaca.exe","dist\README.md","dist\LICENSE" -DestinationPath "cuaca-${{ github.ref_name }}-x86_64-windows.zip"
+      - name: Generate checksum
+        shell: pwsh
+        run: |
+          $file = "dist/cuaca-${{ github.ref_name }}-x86_64-windows.zip"
+          $hash = Get-FileHash -Path $file -Algorithm SHA256
+          $hash.Hash | Out-File -FilePath "$file.sha256"
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: "cuaca-${{ github.ref_name }}-x86_64-windows.zip"
+          files: |
+            cuaca-${{ github.ref_name }}-x86_64-windows.zip
+            cuaca-${{ github.ref_name }}-x86_64-windows.zip.sha256
           generate_release_notes: true
