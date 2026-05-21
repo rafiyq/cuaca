@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--warnings-ttl` flag to configure warnings cache TTL (default 15 minutes).
 - Tooltip shows warning validity period (HH:MM–HH:MM) and infographic link.
 
+## [0.2.3] - 2026-05-21
+
+### Fixed
+
+- Tooltip spacing: blank line after title instead of after description; day header spacing
+- Code quality: clippy warnings cleanup and minor refactors
+
 ## [0.2.1] - 2026-05-20
 
 ### Added

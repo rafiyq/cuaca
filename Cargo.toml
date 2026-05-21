@@ -1,6 +1,6 @@
 [package]
-name = "cuaca"
- version = "0.2.2"
+ name = "cuaca"
+  version = "0.2.3"
 edition = "2021"
 license = "MIT"
 description = "A weather indicator for Waybar using BMKG weather data"
