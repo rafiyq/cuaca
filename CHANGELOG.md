@@ -7,10 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-05-20
+
 ### Added
 
 - Polygon‑based alert matching with fallback to area name.
-- `--warnings-ttl MINUTES` flag to configure cache TTL (default 15).
+- `--warnings-ttl` flag to configure warnings cache TTL (default 15 minutes).
 - Tooltip shows warning validity period (HH:MM–HH:MM) and infographic link.
 
 ## [0.2.1] - 2026-05-20
