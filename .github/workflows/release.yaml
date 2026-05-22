@@ -45,9 +45,7 @@ jobs:
           tar -czf "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz" -C dist .
       - name: Generate checksum
         run: |
-          pushd dist
           sha256sum "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz" > "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz.sha256"
-          popd
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -89,9 +87,7 @@ jobs:
           tar -czf "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz" -C dist .
       - name: Generate checksum
         run: |
-          pushd dist
           shasum -a 256 "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz" > "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz.sha256"
-          popd
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -121,7 +117,7 @@ jobs:
       - name: Generate checksum
         shell: pwsh
         run: |
-          $file = "dist/cuaca-${{ github.ref_name }}-x86_64-windows.zip"
+          $file = "cuaca-${{ github.ref_name }}-x86_64-windows.zip"
           $hash = Get-FileHash -Path $file -Algorithm SHA256
           $hash.Hash | Out-File -FilePath "$file.sha256"
       - name: Create GitHub Release
