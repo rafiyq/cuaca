@@ -51,9 +51,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz
-            cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz.sha256
+          files: cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz.sha256
           generate_release_notes: true
 
   macos:
@@ -97,9 +95,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz
-            cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz.sha256
+          files: cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz.sha256
           generate_release_notes: true
 
   windows:
@@ -131,7 +127,5 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            cuaca-${{ github.ref_name }}-x86_64-windows.zip
-            cuaca-${{ github.ref_name }}-x86_64-windows.zip.sha256
+          files: cuaca-${{ github.ref_name }}-x86_64-windows.zip cuaca-${{ github.ref_name }}-x86_64-windows.zip.sha256
           generate_release_notes: true
