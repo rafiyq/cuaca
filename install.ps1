@@ -144,18 +144,16 @@ try {
         exit 0
     }
 
-    # Extract
-    Extract-Dir = Join-Path $TempDir "extract"
-    New-Item -ItemType Directory -Force -Path $Extract-Dir | Out-Null
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    [System.IO.Compression.ZipFile]::ExtractToDirectory($ArchivePath, $Extract-Dir)
+     # Extract
+     $ExtractDir = Join-Path $TempDir "extract"
+     New-Item -ItemType Directory -Force -Path $ExtractDir | Out-Null
+     Add-Type -AssemblyName System.IO.Compression.FileSystem
+     [System.IO.Compression.ZipFile]::ExtractToDirectory($ArchivePath, $ExtractDir)
 
-    $BinarySrc = Join-Path $Extract-Dir "cuaca.exe"
-    if (-not (Test-Path $BinarySrc)) {
-        # Might be inside a subdirectory named after the asset
-        $possible = Get-ChildItem -Path $Extract-Dir -Recurse -File -Filter cuaca.exe | Select-Object -First 1
-        if ($possible) { $BinarySrc = $possible.FullName } else { throw "Binary not found in archive." }
-    }
+     $BinarySrc = Join-Path $ExtractDir "cuaca.exe"
+     if (-not (Test-Path $BinarySrc)) {
+         throw "Binary not found in archive at $BinarySrc"
+     }
 
     $Dest = Join-Path $BinDir "cuaca.exe"
     Write-Host "Installing to: $Dest"

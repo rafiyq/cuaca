@@ -200,10 +200,10 @@ case "$EXT" in
         ;;
 esac
 
-# The binary should be at dist/cuaca inside the archive (as per CI packaging)
-BIN_SRC="$EXTRACT_DIR/dist/cuaca"
+# The binary is at the root of the archive
+BIN_SRC="$EXTRACT_DIR/cuaca"
 if [ ! -f "$BIN_SRC" ]; then
-    echo "Binary not found in archive at dist/cuaca" >&2
+    echo "Binary not found in archive at $BIN_SRC" >&2
     ls -R "$EXTRACT_DIR"
     exit 1
 fi
