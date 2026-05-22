@@ -5,7 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.4] - 2026-05-22
+
+### Added
+
+- Install scripts (`install.sh`, `install.ps1`) with checksum verification and auto-upgrade.
+- Release workflow now publishes `.sha256` checksum files for each asset.
+
+## [0.2.3] - 2026-05-21
+
+### Fixed
+
+- Tooltip spacing: blank line after title instead of after description; day header spacing
+- Code quality: clippy warnings cleanup and minor refactors
 
 ## [0.2.2] - 2026-05-20
 
@@ -14,13 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Polygon‑based alert matching with fallback to area name.
 - `--warnings-ttl` flag to configure warnings cache TTL (default 15 minutes).
 - Tooltip shows warning validity period (HH:MM–HH:MM) and infographic link.
-
-## [0.2.3] - 2026-05-21
-
-### Fixed
-
-- Tooltip spacing: blank line after title instead of after description; day header spacing
-- Code quality: clippy warnings cleanup and minor refactors
 
 ## [0.2.1] - 2026-05-20
 
