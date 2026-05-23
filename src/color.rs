@@ -136,6 +136,8 @@ pub fn ansi_to_pango(s: &str) -> String {
                 }
             }
             if let Some(inner) = seq.strip_prefix('[') {
+                // Strip trailing 'm' from CSI sequence
+                let inner = inner.trim_end_matches('m');
                 if inner.is_empty() || inner == "0" {
                     if current_fg.is_some() {
                         result.push_str("</span>");
@@ -230,4 +232,47 @@ pub fn warning(text: &str) -> String {
         return text.to_string();
     }
     paint(text, "\x1b[38;5;226m") // bright yellow
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ansi_to_pango_256_color() {
+        let hex = ansi256_to_hex(226);
+        let input = "\x1b[38;5;226mHello\x1b[0m";
+        let output = ansi_to_pango(input);
+        assert!(output.contains(&format!("foreground=\"{}\"", hex)));
+        assert!(output.contains("Hello"));
+        assert!(!output.contains('\x1b'));
+    }
+
+    #[test]
+    fn test_ansi_to_pango_reset() {
+        let input = "\x1b[0mNormal";
+        let output = ansi_to_pango(input);
+        assert_eq!(output, "Normal");
+    }
+
+    #[test]
+    fn test_ansi_to_pango_multiple_colors() {
+        let hex1 = ansi256_to_hex(226);
+        let hex2 = ansi256_to_hex(51);
+        let input = "\x1b[38;5;226mRedish\x1b[38;5;51mBlueish\x1b[0mEnd";
+        let output = ansi_to_pango(input);
+        assert!(output.contains(&format!("foreground=\"{}\"", hex1)));
+        assert!(output.contains(&format!("foreground=\"{}\"", hex2)));
+        assert!(output.contains("Redish"));
+        assert!(output.contains("Blueish"));
+        assert!(output.contains("End"));
+    }
+
+    #[test]
+    fn test_ansi_to_pango_ignore_unsupported() {
+        // Truecolor (38;2) should be ignored; we strip the escape and output plain text.
+        let input = "\x1b[38;2;255;0;0mTrueColor\x1b[0m";
+        let output = ansi_to_pango(input);
+        assert_eq!(output, "TrueColor");
+    }
 }

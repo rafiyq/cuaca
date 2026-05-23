@@ -324,18 +324,20 @@ fn main() {
         escape_pango(&location_parts.join(", "))
     ));
     tooltip.push('\n'); // blank line after title
-                        // Build ASCII art column (6 lines)
+    // Description line (no ASCII prefix)
+    tooltip.push_str(&format!(
+        "<b>{}</b> {} {}\n",
+        escaped_first_desc, display_temp, unit
+    ));
+
+    // Build ASCII art column (5 lines)
     let raw_ascii = get_ascii_icon(weather_code);
-    let mut ascii_lines: Vec<String> = raw_ascii
+    let ascii_lines: Vec<String> = raw_ascii
         .iter()
         .map(|&line| color::ansi_to_pango(line))
         .collect();
-    while ascii_lines.len() < 6 {
-        ascii_lines.push(String::new());
-    }
 
-    // Prepare detail lines with proper escaping
-    let desc_detail = format!("<b>{}</b> {} {}", escaped_first_desc, display_temp, unit);
+    // Prepare detail lines without description
     let hu_detail = format!(
         "{}: {}%",
         lang.humidity(),
@@ -360,7 +362,6 @@ fn main() {
     let vs_detail = format!("{}: {}", lang.visibility(), escape_pango(vs_text));
 
     let detail_lines = [
-        &desc_detail,
         &hu_detail,
         &tcc_detail,
         &tp_detail,
