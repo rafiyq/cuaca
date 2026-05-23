@@ -15,7 +15,9 @@ use serde_json::{json, Value};
 use cuaca::cache::cache_dir;
 use cuaca::cli::{Args, OutputFormat};
 use cuaca::color;
-use cuaca::constants::{CLOUD_COVER_ICON, ERROR_ICON, PRECIPITATION_ICON, VISIBILITY_ICON};
+use cuaca::constants::{
+    get_ascii_icon, CLOUD_COVER_ICON, ERROR_ICON, PRECIPITATION_ICON, VISIBILITY_ICON,
+};
 use cuaca::format::{
     celsius_to_fahrenheit, format_indicator, format_temp, format_time, format_wind_dir_icon,
     get_weather_icon,
@@ -322,38 +324,58 @@ fn main() {
         escape_pango(&location_parts.join(", "))
     ));
     tooltip.push('\n'); // blank line after title
-    tooltip.push_str(&format!(
-        "<b>{}</b> {} {}\n",
-        escaped_first_desc, display_temp, unit
-    ));
+                        // Build ASCII art column (6 lines)
+    let raw_ascii = get_ascii_icon(weather_code);
+    let mut ascii_lines: Vec<String> = raw_ascii
+        .iter()
+        .map(|&line| color::ansi_to_pango(line))
+        .collect();
+    while ascii_lines.len() < 6 {
+        ascii_lines.push(String::new());
+    }
 
-    // Details
-    tooltip += &format!(
-        "{}: {}%\n",
+    // Prepare detail lines with proper escaping
+    let desc_detail = format!("<b>{}</b> {} {}", escaped_first_desc, display_temp, unit);
+    let hu_detail = format!(
+        "{}: {}%",
         lang.humidity(),
         first_slot["hu"].as_i64().unwrap_or(0)
     );
-
     let tcc = first_slot["tcc"].as_i64().unwrap_or(0);
-    tooltip += &format!("{}: {}%\n", lang.cloud_cover(), tcc);
-
+    let tcc_detail = format!("{}: {}%", lang.cloud_cover(), tcc);
     let tp = first_slot["tp"].as_f64().unwrap_or(0.0);
-    tooltip += &format!("{}: {} mm\n", lang.precipitation(), tp);
-
+    let tp_detail = format!("{}: {:.1} mm", lang.precipitation(), tp);
     let ws = first_slot["ws"].as_f64().unwrap_or(0.0);
     let wd_deg = first_slot["wd_deg"].as_i64().unwrap_or(0);
     let wd_cardinal = first_slot["wd"].as_str().unwrap_or("?");
-    tooltip += &format!(
-        "{}: {} {} {} {}\n",
+    let wind_detail = format!(
+        "{}: {} {} {} {}",
         lang.wind(),
         format_wind_dir_icon(wd_deg, args.nerd),
         wd_cardinal,
         ws,
-        lang.wind_unit(),
+        lang.wind_unit()
     );
-
     let vs_text = first_slot["vs_text"].as_str().unwrap_or("?");
-    tooltip += &format!("{}: {}\n", lang.visibility(), escape_pango(vs_text));
+    let vs_detail = format!("{}: {}", lang.visibility(), escape_pango(vs_text));
+
+    let detail_lines = [
+        &desc_detail,
+        &hu_detail,
+        &tcc_detail,
+        &tp_detail,
+        &wind_detail,
+        &vs_detail,
+    ];
+
+    for (art, detail) in ascii_lines.iter().zip(detail_lines.iter()) {
+        let art_mono = if art.is_empty() {
+            String::new()
+        } else {
+            format!(r#"<span font_family="monospace">{}</span>"#, art)
+        };
+        tooltip.push_str(&format!("{} {}\n", art_mono, detail));
+    }
 
     // Blank line before warnings/day sections
     tooltip.push('\n');

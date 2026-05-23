@@ -90,6 +90,108 @@ fn strip_ansi(s: &str) -> String {
     result
 }
 
+/// Compute hex color for ANSI 256-color index.
+fn ansi256_to_hex(n: u8) -> String {
+    // 0-15: standard 16 colors
+    let basic: [&str; 16] = [
+        "#000000", "#800000", "#008000", "#808000", "#000080", "#800080", "#008080", "#c0c0c0",
+        "#808080", "#ff0000", "#00ff00", "#ffff00", "#0000ff", "#ff00ff", "#00ffff", "#ffffff",
+    ];
+    if n < 16 {
+        return basic[n as usize].to_string();
+    }
+    // 16-231: 6x6x6 color cube
+    if n < 232 {
+        let idx = n as usize - 16;
+        let r = idx / 36;
+        let g = (idx % 36) / 6;
+        let b = idx % 6;
+        // Intensity values for each channel level 0..5
+        let vals = [0, 95, 135, 175, 215, 255];
+        let rv = vals[r];
+        let gv = vals[g];
+        let bv = vals[b];
+        return format!("#{:02x}{:02x}{:02x}", rv, gv, bv);
+    }
+    // 232-255: grayscale ramp from #080808 to #eeeeee (24 shades)
+    let shade = (n as usize - 232) * 10 + 8;
+    format!("#{:02x}{:02x}{:02x}", shade, shade, shade)
+}
+
+/// Convert ANSI escape sequences (basic 256-color) to Pango markup.
+/// Supports: reset (0), foreground 256-color (38;5;N). Ignores unsupported codes.
+pub fn ansi_to_pango(s: &str) -> String {
+    let mut result = String::new();
+    let mut chars = s.chars().peekable();
+    let mut current_fg: Option<u8> = None;
+
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            // accumulate CSI sequence
+            let mut seq = String::new();
+            for c2 in chars.by_ref() {
+                seq.push(c2);
+                if c2 == 'm' {
+                    break;
+                }
+            }
+            if let Some(inner) = seq.strip_prefix('[') {
+                if inner.is_empty() || inner == "0" {
+                    if current_fg.is_some() {
+                        result.push_str("</span>");
+                        current_fg = None;
+                    }
+                    continue;
+                }
+                let parts: Vec<Option<u8>> =
+                    inner.split(';').map(|s| s.parse::<u8>().ok()).collect();
+                let mut i = 0;
+                while i < parts.len() {
+                    match parts[i] {
+                        Some(0) => {
+                            if current_fg.is_some() {
+                                result.push_str("</span>");
+                                current_fg = None;
+                            }
+                        }
+                        Some(38) => {
+                            // check for 38;5;N
+                            if i + 2 < parts.len() && parts[i + 1] == Some(5) {
+                                if let Some(n) = parts[i + 2] {
+                                    if current_fg != Some(n) {
+                                        if current_fg.is_some() {
+                                            result.push_str("</span>");
+                                        }
+                                        let hex = ansi256_to_hex(n);
+                                        result.push_str(&format!(r#"<span foreground="{}">"#, hex));
+                                        current_fg = Some(n);
+                                    }
+                                    i += 2;
+                                }
+                            }
+                            // ignore 38;2 (truecolor)
+                        }
+                        Some(48) => {
+                            // Background color, ignore
+                            if i + 2 < parts.len() {
+                                i += 2;
+                            }
+                        }
+                        _ => {}
+                    }
+                    i += 1;
+                }
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    if current_fg.is_some() {
+        result.push_str("</span>");
+    }
+    result
+}
+
 pub fn weather_icon_line(line: &str, code: u32) -> String {
     if !is_color() {
         return strip_ansi(line);
