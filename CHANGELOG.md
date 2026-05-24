@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Tooltip: multi‑line ASCII weather icon with preserved 256‑color palette and monospace font as a left‑hand column beside description.
+- Terminal: hourly forecast table for Tomorrow and Day After Tomorrow (columns: Time, Temp, Description, Wind, Cloud, Precip, Vis) with fixed‑width formatting and 2‑space left margin. Day headers bold; column headers dim.
+- Added 2‑space left margin to title (“Weather Report:”), date line, and source line for visual consistency.
+
+### Fixed
+
+- Tooltip ASCII art colors: fixed `ansi_to_pango` CSI parsing (strip trailing `m`).
+- Terminal output: removed day‑summary lines; corrected table separator placement and column alignment.
+
+### Changed
+
+- Installers (`install.sh`, `install.ps1`) expect binary at archive root (no `dist/` subdirectory).
+- Release workflow: cache whole `target/`, inject `GITHUB_TOKEN` for `wilayah` API calls, and use newline‑separated file list for `action-gh-release`.
+
 ## [0.2.4] - 2026-05-22
 
 ### Added

@@ -106,13 +106,12 @@ pub fn render_terminal(
 
     let mut out = String::new();
 
-    out.push_str(&color::header(&format!(
-        "{}: {}",
-        lang.weather_report(),
-        location
-    )));
+    out.push_str(&format!(
+        "  {}",
+        color::header(&format!("{}: {}", lang.weather_report(), location))
+    ));
     out.push('\n');
-    out.push_str(&format!("{}\n", first_date));
+    out.push_str(&format!("  {}\n", first_date));
     out.push('\n');
     out.push('\n');
 
@@ -269,62 +268,94 @@ pub fn render_terminal(
     );
     out.push('\n');
 
-    let day_labels = [lang.today(), lang.tomorrow(), lang.day_after_tomorrow()];
-    for (g_idx, group) in cuaca_groups.iter().enumerate() {
+    // Forecast table for Tomorrow and Day After Tomorrow (skip Today)
+    let day_labels = [lang.tomorrow(), lang.day_after_tomorrow()];
+    for (g_idx, group) in cuaca_groups.iter().enumerate().skip(1).take(2) {
         let slots: Vec<&Value> = group.as_array().map_or(vec![], |s| s.iter().collect());
         if slots.is_empty() {
             continue;
         }
 
+        // Day header
         let date_str = slots
             .first()
             .and_then(|s| s["local_datetime"].as_str())
             .and_then(|dt| NaiveDateTime::parse_from_str(dt, "%Y-%m-%d %H:%M:%S").ok())
             .map(|dt| dt.date().format_localized("%a %d %b", locale).to_string())
             .unwrap_or_else(|| "Unknown".to_string());
-
-        let label = day_labels.get(g_idx).unwrap_or(&"");
-        let header = if !label.is_empty() {
-            format!("{}, {}", label, date_str)
-        } else {
-            date_str.clone()
-        };
-
-        let day_temps: Vec<i64> = slots.iter().map(|s| s["t"].as_i64().unwrap_or(0)).collect();
-        let min_t = day_temps.iter().min().copied().unwrap_or(0);
-        let max_t = day_temps.iter().max().copied().unwrap_or(0);
-        let total_rain: f64 = slots.iter().map(|s| s["tp"].as_f64().unwrap_or(0.0)).sum();
-        let avg_humid: f64 = {
-            let sum: i64 = slots.iter().map(|s| s["hu"].as_i64().unwrap_or(0)).sum();
-            sum as f64 / slots.len() as f64
-        };
-
-        let desc_key = lang.weather_desc_key();
-        let first_desc = slots[0][desc_key].as_str().unwrap_or("?");
-
-        let (min_t, max_t) = if fahrenheit {
-            (celsius_to_fahrenheit(min_t), celsius_to_fahrenheit(max_t))
-        } else {
-            (min_t, max_t)
-        };
-
-        let days_code = slots[0]["weather"].as_u64().unwrap_or(0) as u32;
-
+        let label = day_labels[g_idx - 1];
         out.push_str(&format!(
-            "  {}  {}  {}-{}°C  {:.1} mm {}  {:.0}% {}\n",
-            header,
-            color::desc_text(first_desc, days_code),
-            min_t,
-            max_t,
-            total_rain,
-            lang.total(),
-            avg_humid,
-            lang.average_label(),
+            "  {}",
+            color::header(&format!("{}, {}", label, date_str))
         ));
+        out.push('\n');
+
+        // Column headers (using fixed widths)
+        out.push_str(&format!(
+            "  {}",
+            color::dim(&format!(
+                "{:>5}  {:<6}  {:<20}  {:<15}  {:>5}  {:>7}  {:<8}",
+                "Time", "Temp", "Desc", "Wind", "Cloud", "Precip", "Vis"
+            ))
+        ));
+        out.push('\n');
+        out.push_str(&format!(
+            "  {}",
+            color::dim(
+                "-----  ------  --------------------  ---------------  -----  -------  --------",
+            )
+        ));
+        out.push('\n');
+
+        // Hourly rows
+        for slot in slots {
+            // Time: HH:MM
+            let time_str = slot["local_datetime"]
+                .as_str()
+                .and_then(|dt_str| NaiveDateTime::parse_from_str(dt_str, "%Y-%m-%d %H:%M:%S").ok())
+                .map(|dt| dt.format("%H:%M").to_string())
+                .unwrap_or("??:??".to_string());
+
+            // Temperature
+            let temp_c = slot["t"].as_i64().unwrap_or(0);
+            let temp_display = if fahrenheit {
+                celsius_to_fahrenheit(temp_c)
+            } else {
+                temp_c
+            };
+            let temp_str = format!("{}{}", temp_display, if fahrenheit { "°F" } else { "°C" });
+
+            // Description (plain, without color)
+            let desc_key = lang.weather_desc_key();
+            let desc = slot[desc_key].as_str().unwrap_or("?");
+            let desc_str = desc;
+
+            // Wind: cardinal + speed + unit
+            let ws = slot["ws"].as_f64().unwrap_or(0.0);
+            let wd = slot["wd"].as_str().unwrap_or("?");
+            let wind_str = format!("{} {:.0} {}", wd, ws, lang.wind_unit());
+
+            // Cloud cover percentage
+            let cloud = slot["tcc"].as_f64().unwrap_or(0.0);
+            let cloud_str = format!("{:.0}%", cloud);
+
+            // Precipitation
+            let precip = slot["tp"].as_f64().unwrap_or(0.0);
+            let precip_str = format!("{:.1} mm", precip);
+
+            // Visibility
+            let vis_str = slot["vs_text"].as_str().unwrap_or("?");
+
+            out.push_str(&format!(
+                "  {:>5}  {:<6}  {:<20}  {:<15}  {:>5}  {:>7}  {:<8}\n",
+                time_str, temp_str, desc_str, wind_str, cloud_str, precip_str, vis_str
+            ));
+        }
+        out.push('\n'); // blank line after each day
     }
 
     out.push('\n');
-    out.push_str(&color::dim(lang.source()));
+    out.push_str(&format!("  {}", color::dim(lang.source())));
     out.push('\n');
 
     out
