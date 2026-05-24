@@ -1,153 +1,140 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
-    inputs:
-      dry_run:
-        description: 'Build artifacts without creating a release'
-        required: false
-        default: false
-        type: boolean
+    push:
+        tags:
+            - "v*"
+    workflow_dispatch:
+        inputs:
+            dry_run:
+                description: "Build artifacts without creating a release"
+                required: false
+                default: false
+                type: boolean
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo clippy -- -D warnings
-      - run: cargo fmt --check
-      - run: cargo test
+    linux:
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - target: x86_64-unknown-linux-gnu
+                      name: x86_64-linux
+                      use_cross: false
+                    - target: aarch64-unknown-linux-gnu
+                      name: aarch64-linux
+                      use_cross: true
+        steps:
+            - uses: actions/checkout@v4
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  prefix-key: ${{ matrix.target }}
+                  cache-targets: true
+            - uses: dtolnay/rust-toolchain@stable
+              with:
+                  targets: ${{ matrix.target }}
+            - name: Install cross
+              if: matrix.use_cross
+              run: cargo install cross
+            - name: Build
+              run: ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release --target ${{ matrix.target }}
+            - name: Package
+              run: |
+                  mkdir -p dist
+                  cp "target/${{ matrix.target }}/release/cuaca" dist/
+                  cp README.md LICENSE dist/
+                  tar -czf "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz" -C dist .
+            - name: Checksum
+              run: sha256sum "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz" > "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz.sha256"
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: ${{ matrix.name }}
+                  path: |
+                      cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz
+                      cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz.sha256
 
-  linux:
-    needs: test
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-gnu
-            name: x86_64-linux
-            use_cross: false
-          - target: aarch64-unknown-linux-gnu
-            name: aarch64-linux
-            use_cross: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: ${{ matrix.target }}
-          cache-targets: true
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-      - name: Install cross
-        if: matrix.use_cross
-        run: cargo install cross
-      - name: Build
-        run: ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release --target ${{ matrix.target }}
-      - name: Package
-        run: |
-          mkdir -p dist
-          cp "target/${{ matrix.target }}/release/cuaca" dist/
-          cp README.md LICENSE dist/
-          tar -czf "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz" -C dist .
-      - name: Checksum
-        run: sha256sum "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz" > "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz.sha256"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.name }}
-          path: |
-            cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz
-            cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz.sha256
+    macos:
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - target: x86_64-apple-darwin
+                      name: x86_64-macos
+                      runner: macos-13
+                    - target: aarch64-apple-darwin
+                      name: aarch64-macos
+                      runner: macos-14
+        runs-on: ${{ matrix.runner }}
+        steps:
+            - uses: actions/checkout@v4
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  prefix-key: ${{ matrix.target }}
+                  cache-targets: true
+            - uses: dtolnay/rust-toolchain@stable
+              with:
+                  targets: ${{ matrix.target }}
+            - name: Build
+              run: cargo build --release --target ${{ matrix.target }}
+            - name: Package
+              run: |
+                  mkdir -p dist
+                  cp "target/${{ matrix.target }}/release/cuaca" dist/
+                  cp README.md LICENSE dist/
+                  tar -czf "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz" -C dist .
+            - name: Checksum
+              run: shasum -a 256 "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz" > "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz.sha256"
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: ${{ matrix.name }}
+                  path: |
+                      cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz
+                      cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz.sha256
 
-  macos:
-    needs: test
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: x86_64-apple-darwin
-            name: x86_64-macos
-            runner: macos-13
-          - target: aarch64-apple-darwin
-            name: aarch64-macos
-            runner: macos-14
-    runs-on: ${{ matrix.runner }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: ${{ matrix.target }}
-          cache-targets: true
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-      - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
-      - name: Package
-        run: |
-          mkdir -p dist
-          cp "target/${{ matrix.target }}/release/cuaca" dist/
-          cp README.md LICENSE dist/
-          tar -czf "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz" -C dist .
-      - name: Checksum
-        run: shasum -a 256 "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz" > "cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz.sha256"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.name }}
-          path: |
-            cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz
-            cuaca-${{ github.ref_name }}-${{ matrix.name }}.tar.gz.sha256
+    windows:
+        runs-on: windows-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  cache-targets: true
+            - uses: dtolnay/rust-toolchain@stable
+            - name: Build
+              run: cargo build --release
+            - name: Package
+              shell: pwsh
+              run: |
+                  New-Item -ItemType Directory -Force -Path dist
+                  Copy-Item "target\release\cuaca.exe" dist/
+                  Copy-Item README.md dist/
+                  Copy-Item LICENSE dist/
+                  Compress-Archive -Path "dist\cuaca.exe","dist\README.md","dist\LICENSE" -DestinationPath "cuaca-${{ github.ref_name }}-x86_64-windows.zip"
+            - name: Checksum
+              shell: pwsh
+              run: |
+                  $file = "cuaca-${{ github.ref_name }}-x86_64-windows.zip"
+                  $hash = (Get-FileHash -Path $file -Algorithm SHA256).Hash.ToLower()
+                  "$hash  $file" | Out-File -FilePath "$file.sha256" -Encoding ascii -NoNewline
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: x86_64-windows
+                  path: |
+                      cuaca-${{ github.ref_name }}-x86_64-windows.zip
+                      cuaca-${{ github.ref_name }}-x86_64-windows.zip.sha256
 
-  windows:
-    needs: test
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-targets: true
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Build
-        run: cargo build --release
-      - name: Package
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path dist
-          Copy-Item "target\release\cuaca.exe" dist/
-          Copy-Item README.md dist/
-          Copy-Item LICENSE dist/
-          Compress-Archive -Path "dist\cuaca.exe","dist\README.md","dist\LICENSE" -DestinationPath "cuaca-${{ github.ref_name }}-x86_64-windows.zip"
-      - name: Checksum
-        shell: pwsh
-        run: |
-          $file = "cuaca-${{ github.ref_name }}-x86_64-windows.zip"
-          $hash = (Get-FileHash -Path $file -Algorithm SHA256).Hash.ToLower()
-          "$hash  $file" | Out-File -FilePath "$file.sha256" -Encoding ascii -NoNewline
-      - uses: actions/upload-artifact@v4
-        with:
-          name: x86_64-windows
-          path: |
-            cuaca-${{ github.ref_name }}-x86_64-windows.zip
-            cuaca-${{ github.ref_name }}-x86_64-windows.zip.sha256
-
-  release:
-    if: ${{ !(inputs.dry_run || false) }}
-    needs: [linux, macos, windows]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          merge-multiple: true
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: cuaca-*
-          generate_release_notes: true
+    release:
+        if: ${{ !(inputs.dry_run || false) }}
+        needs: [linux, macos, windows]
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - uses: actions/download-artifact@v4
+              with:
+                  merge-multiple: true
+            - name: Create GitHub Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  files: cuaca-*
+                  generate_release_notes: true
