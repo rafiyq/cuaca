@@ -149,39 +149,35 @@ pub fn ansi_to_pango(s: &str) -> String {
                     inner.split(';').map(|s| s.parse::<u8>().ok()).collect();
                 let mut i = 0;
                 while i < parts.len() {
+                    let mut parts_matched = 0;
                     match parts[i] {
-                        Some(0) => {
-                            if current_fg.is_some() {
-                                result.push_str("</span>");
-                                current_fg = None;
-                            }
+                        Some(0) if current_fg.is_some() => {
+                            result.push_str("</span>");
+                            current_fg = None;
                         }
-                        Some(38) => {
-                            // check for 38;5;N
-                            if i + 2 < parts.len() && parts[i + 1] == Some(5) {
-                                if let Some(n) = parts[i + 2] {
-                                    if current_fg != Some(n) {
-                                        if current_fg.is_some() {
-                                            result.push_str("</span>");
-                                        }
-                                        let hex = ansi256_to_hex(n);
-                                        result.push_str(&format!(r#"<span foreground="{}">"#, hex));
-                                        current_fg = Some(n);
-                                    }
-                                    i += 2;
+                        Some(38)
+                            if i + 2 < parts.len()
+                                && parts[i + 1] == Some(5)
+                                && parts[i + 2].is_some() =>
+                        {
+                            let n = parts[i + 2].unwrap();
+                            if current_fg != Some(n) {
+                                if current_fg.is_some() {
+                                    result.push_str("</span>");
                                 }
+                                let hex = ansi256_to_hex(n);
+                                result.push_str(&format!(r#"<span foreground="{}">"#, hex));
+                                current_fg = Some(n);
                             }
-                            // ignore 38;2 (truecolor)
+                            parts_matched = 2;
                         }
-                        Some(48) => {
+                        Some(48) if i + 2 < parts.len() => {
                             // Background color, ignore
-                            if i + 2 < parts.len() {
-                                i += 2;
-                            }
+                            parts_matched = 2;
                         }
                         _ => {}
                     }
-                    i += 1;
+                    i += 1 + parts_matched;
                 }
             }
         } else {

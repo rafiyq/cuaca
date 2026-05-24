@@ -28,7 +28,7 @@ use cuaca::util::escape_pango;
 use cuaca::warnings;
 
 fn error_json(text: &str, tooltip: &str) -> String {
-    format!("{{\"text\":\"{}\", \"tooltip\":\"{}\"}}", text, tooltip)
+    json!({ "text": text, "tooltip": tooltip }).to_string()
 }
 
 #[derive(Deserialize)]
@@ -324,7 +324,7 @@ fn main() {
         escape_pango(&location_parts.join(", "))
     ));
     tooltip.push('\n'); // blank line after title
-    // Description line (no ASCII prefix)
+                        // Description line (no ASCII prefix)
     tooltip.push_str(&format!(
         "<b>{}</b> {} {}\n",
         escaped_first_desc, display_temp, unit

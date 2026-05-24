@@ -90,7 +90,7 @@ pub fn render_terminal(
         today_slots
             .iter()
             .filter_map(|s| s["t"].as_f64())
-            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .max_by(|a, b| a.total_cmp(b))
             .unwrap_or(temp_c as f64)
     };
     let max_temp = if fahrenheit {
@@ -371,18 +371,23 @@ fn render_row(
     panel3: &[String],
 ) {
     let title_field = |t: &str| -> String {
-        let t = if t.len() > 24 { &t[..24] } else { t };
+        // Truncate safely to 24 characters (avoid splitting multi-byte)
+        let t_truncated = if t.chars().count() > 24 {
+            t.chars().take(24).collect()
+        } else {
+            t.to_string()
+        };
         let pad_left = 6;
         let graph_w = 24;
         let total_w = pad_left + graph_w;
-        let title_len = t.len();
+        let title_len = t_truncated.len();
         let pad = if title_len >= graph_w {
             0
         } else {
             (graph_w - title_len) / 2
         };
         let mut field = " ".repeat(pad_left + pad);
-        field.push_str(t);
+        field.push_str(&t_truncated);
         let remaining = total_w - field.len();
         if remaining > 0 {
             field.push_str(&" ".repeat(remaining));
