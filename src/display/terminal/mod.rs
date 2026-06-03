@@ -8,11 +8,9 @@ use crate::graphs::column_chart_panel;
 use crate::warnings;
 
 mod colorize;
-mod icons;
 mod layout;
 
 use self::colorize::{colorize_spark_panel, colorize_temp_panel};
-use self::icons::format_wind_dir_icon;
 use self::layout::render_row;
 
 pub fn render_terminal(
@@ -150,7 +148,7 @@ pub fn render_terminal(
     out.push_str(&format!(
         "     {}  {} {:.0} {}\n",
         color::weather_icon_line(icon[2], first_code),
-        format_wind_dir_icon(wd_deg),
+        crate::format::format_wind_dir_icon(wd_deg, args.nerd),
         ws as i64,
         lang.wind_unit(),
     ));
