@@ -1,3 +1,5 @@
+//! Orchestration of the application logic.
+
 use super::args::Args;
 use crate::color;
 use crate::constants::{
@@ -24,6 +26,10 @@ use std::time::{Duration, SystemTime};
 
 use crate::cli::args::OutputFormat;
 
+/// Main entry point for the CLI application.
+///
+/// Parses arguments, sets color mode, resolves location, fetches weather,
+/// and renders output according to the selected format.
 pub fn run(args: Args) -> Result<(), CuacaError> {
     // set color mode
     color::set_color_mode(args.color);

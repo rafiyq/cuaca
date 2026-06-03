@@ -1,3 +1,5 @@
+//! General utility functions.
+
 /// Escape Pango/XML/HTML special characters in a string.
 /// Converts &, <, > to their entity equivalents.
 pub fn escape_pango(s: &str) -> String {

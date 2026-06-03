@@ -1,3 +1,5 @@
+//! Terminal UI renderer using ASCII art and color.
+
 use chrono::{Locale, NaiveDateTime, Timelike};
 use serde_json::Value;
 
@@ -13,6 +15,9 @@ mod layout;
 use self::colorize::{colorize_spark_panel, colorize_temp_panel};
 use self::layout::render_row;
 
+/// Render the terminal output given weather data and arguments.
+///
+/// Produces a multi‑line string with weather forecast, charts, and warnings.
 pub fn render_terminal(
     weather: &Value,
     args: &crate::cli::args::Args,

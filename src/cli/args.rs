@@ -1,3 +1,5 @@
+//! CLI arguments definition.
+
 use clap::{Parser, ValueEnum};
 
 use crate::core::color::ColorMode;
@@ -13,6 +15,7 @@ pub enum OutputFormat {
     Json,
 }
 
+/// Command-line arguments parsed by clap.
 #[derive(Parser, Debug)]
 #[command(
     name = "cuaca",

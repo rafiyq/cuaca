@@ -1,3 +1,5 @@
+//! Weather warnings (nowcast) fetching and parsing.
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 

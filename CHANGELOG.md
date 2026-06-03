@@ -5,13 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.6] - 2026-06-03
+
+### Added
+
+- Comprehensive test suite (36 tests) covering terminal rendering, format helpers, warnings parsing, and polygon math.
+- `core` module: pure weather logic independent of I/O and display.
+- `cli` module: separate argument parsing (`args`) and orchestration (`run`).
+- `display` module: terminal renderer with layout, colorization, and icon helpers.
+- Structured error handling via `CuacaError` using `thiserror`.
+- Location resolution (`resolve`) with GPS cache and fallback to `wilayah` database.
+- Weather fetching (`fetch_weather`) with retry logic and disk cache.
+- Warnings modularization: `warnings/cache`, `rss`, `cap`, `polygon`, `fetch` with proper `Result` propagation.
+- `error_json` utility for Waybar-compatible error output.
+- Module documentation for core components.
+
+### Changed
+
+- `main` reduced to thin wrapper calling `cli::run`.
+- Terminal rendering now uses dedicated `layout` and `colorize` helpers.
+- `format_wind_dir_icon` centralized in `format` module, respecting `nerd` flag.
+- Error handling throughout uses `Result` instead of `process::exit`.
+- Warnings fetch now returns `Result<Vec<Warning>, CuacaError>`; callers fall back to empty on error.
+- Color handling separated from ASCII icons (dynamic coloring based on weather code).
+- Consistent formatting with `cargo fmt`.
+- Release workflow: macOS runners changed to `macos-latest`; automatic release creation removed (build-only workflow).
+
+### Fixed
+
+- Clippy `collapsible-match` lint by refactoring `ansi_to_pango`.
+- NaN panic in chart scaling via `total_cmp`.
+- UTF-8 safe truncation in terminal title field using `chars().take()`.
+- JSON injection safety in `error_json` using `serde_json::json!`.
+- Release workflow token requirement eliminated (build-only artifacts).
+
 ## [0.2.5] - 2026-05-24
 
 ### Added
 
 - Tooltip: multi‑line ASCII weather icon with preserved 256‑color palette and monospace font as a left‑hand column beside description.
 - Terminal: hourly forecast table for Tomorrow and Day After Tomorrow (columns: Time, Temp, Description, Wind, Cloud, Precip, Vis) with fixed‑width formatting and 2‑space left margin. Day headers bold; column headers dim.
-- Added 2‑space left margin to title (“Weather Report:”), date line, and source line for visual consistency.
+- Added 2‑space left margin to title ("Weather Report:"), date line, and source line for visual consistency.
 
 ### Fixed
 

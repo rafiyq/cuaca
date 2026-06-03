@@ -50,6 +50,12 @@ fn filter_by_province(
     Ok(alerts)
 }
 
+/// Fetch active weather warnings for a province, optionally filtered by location.
+///
+/// Uses RSS feed and CAP alerts with caching. Returns a list of warnings.
+/// Errors are propagated as `CuacaError`.
+///
+/// Note: Callers typically use `unwrap_or_default` to fall back to an empty list on error.
 pub fn fetch_warnings(
     province: &str,
     lang: Lang,
