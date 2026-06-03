@@ -454,3 +454,6 @@ fn format_wind_dir_icon(degrees: i64) -> &'static str {
         "\u{2196}\u{fe0f}",
     ][dir]
 }
+
+#[cfg(test)]
+mod tests;
