@@ -9,7 +9,7 @@ pub enum CuacaError {
     Network(#[from] reqwest::Error),
 
     #[error("Parse error: {0}")]
-    Parse(#[from] serde_json::Error),
+    Parse(String),
 
     #[error("Cache I/O error: {0}")]
     Cache(#[from] std::io::Error),
@@ -22,6 +22,12 @@ pub enum CuacaError {
 
     #[error("Unexpected error: {0}")]
     Unknown(String),
+}
+
+impl From<serde_json::Error> for CuacaError {
+    fn from(e: serde_json::Error) -> Self {
+        CuacaError::Parse(e.to_string())
+    }
 }
 
 // For warnings fetch failures, we may want a separate type or alias.

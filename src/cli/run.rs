@@ -127,6 +127,7 @@ pub fn run(args: Args) -> Result<(), CuacaError> {
         let lat = weather["lokasi"]["lat"].as_f64().unwrap_or(0.0);
         let lon = weather["lokasi"]["lon"].as_f64().unwrap_or(0.0);
         warnings::fetch_warnings(province, args.lang, lat, lon, args.warnings_ttl)
+            .unwrap_or_default()
     } else {
         vec![]
     };

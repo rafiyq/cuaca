@@ -6,6 +6,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::cache::cache_dir;
+use crate::core::error::CuacaError;
 
 fn parse_polygon(s: &str) -> Vec<(f64, f64)> {
     s.split_whitespace()
@@ -121,20 +122,21 @@ fn alert_cache_path(id: &str) -> PathBuf {
         .join(format!("{}.json", id))
 }
 
-fn parse_rss(xml: &[u8]) -> Result<RssFeed, Box<dyn std::error::Error>> {
+fn parse_rss(xml: &[u8]) -> Result<RssFeed, CuacaError> {
     let mut deserializer = Deserializer::from_reader(xml);
-    let feed = RssFeed::deserialize(&mut deserializer)?;
-    Ok(feed)
+    RssFeed::deserialize(&mut deserializer).map_err(|e| CuacaError::Parse(e.to_string()))
 }
 
-fn parse_cap(xml: &[u8]) -> Result<CapAlert, Box<dyn std::error::Error>> {
+fn parse_cap(xml: &[u8]) -> Result<CapAlert, CuacaError> {
     let mut deserializer = Deserializer::from_reader(xml);
-    let alert = CapAlert::deserialize(&mut deserializer)?;
-    Ok(alert)
+    CapAlert::deserialize(&mut deserializer).map_err(|e| CuacaError::Parse(e.to_string()))
 }
 
 #[allow(dead_code)]
-fn filter_by_province(mut alerts: Vec<Warning>, province: &str) -> Vec<Warning> {
+fn filter_by_province(
+    mut alerts: Vec<Warning>,
+    province: &str,
+) -> Result<Vec<Warning>, CuacaError> {
     let province_lower = province.to_ascii_lowercase();
     alerts.retain(|w| w.area_desc.to_ascii_lowercase().contains(&province_lower));
     let now = Utc::now();
@@ -143,7 +145,7 @@ fn filter_by_province(mut alerts: Vec<Warning>, province: &str) -> Vec<Warning> 
         let exp = w.expires.unwrap_or(now + Duration::days(1));
         now >= eff && now < exp
     });
-    alerts
+    Ok(alerts)
 }
 
 /// Extract a stable ID from the CAP link URL, e.g., ".../CBT20260520001_alert.xml" -> "CBT20260520001"
@@ -168,7 +170,7 @@ pub fn fetch_warnings(
     lat: f64,
     lon: f64,
     ttl_minutes: u64,
-) -> Vec<Warning> {
+) -> Result<Vec<Warning>, CuacaError> {
     // Ensure cache directory exists
     let warn_dir = warnings_cache_dir();
     let _ = fs::create_dir_all(&warn_dir);
@@ -190,15 +192,9 @@ pub fn fetch_warnings(
     };
 
     let rss_items: Vec<ItemCacheEntry> = if rss_fresh {
-        if let Ok(data) = fs::read(&rss_path) {
-            if let Ok(cache) = serde_json::from_slice::<RssCache>(&data) {
-                cache.items
-            } else {
-                vec![]
-            }
-        } else {
-            vec![]
-        }
+        let data = fs::read(&rss_path)?;
+        let cache = serde_json::from_slice::<RssCache>(&data)?;
+        cache.items
     } else {
         // Fresh fetch
         let rss_url = match lang {
@@ -206,18 +202,9 @@ pub fn fetch_warnings(
             crate::lang::Lang::ID => "https://www.bmkg.go.id/alerts/nowcast/id",
         };
         let client = Client::new();
-        let rss_resp = match client.get(rss_url).send() {
-            Ok(resp) => resp,
-            Err(_) => return vec![],
-        };
-        let rss_bytes = match rss_resp.bytes() {
-            Ok(b) => b,
-            Err(_) => return vec![],
-        };
-        let rss_feed = match parse_rss(&rss_bytes) {
-            Ok(feed) => feed,
-            Err(_) => return vec![],
-        };
+        let rss_resp = client.get(rss_url).send()?;
+        let rss_bytes = rss_resp.bytes()?;
+        let rss_feed = parse_rss(&rss_bytes)?;
         let mut entries = Vec::new();
         for item in rss_feed.channel.item {
             if let Some(ref link) = item.link {
@@ -331,7 +318,7 @@ pub fn fetch_warnings(
         });
     }
 
-    filtered
+    Ok(filtered)
 }
 
 fn parse_iso(s: &str) -> Option<DateTime<Utc>> {
