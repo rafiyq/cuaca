@@ -1,11 +1,11 @@
 use crate::core::cache::cache_dir;
 use crate::core::error::CuacaError;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 use std::fs::{create_dir_all, read_to_string, File};
 use std::io::Write;
 use std::path::PathBuf;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 use wilayah;
 
