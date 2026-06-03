@@ -58,7 +58,7 @@ pub fn format_wind_dir_icon(degrees: i64, nerd: bool) -> &'static str {
     }
 }
 
-pub fn get_weather_icon(code: u32, nerd: bool) -> &'static str {
+pub fn get_weather_icon(weather_code: u32, nerd: bool) -> &'static str {
     let table = if nerd {
         WEATHER_CODES_NERD
     } else {
@@ -66,7 +66,7 @@ pub fn get_weather_icon(code: u32, nerd: bool) -> &'static str {
     };
     table
         .iter()
-        .find(|(c, _)| *c == code)
+        .find(|(c, _)| *c == weather_code)
         .map(|(_, s)| *s)
         .unwrap_or(if nerd {
             FALLBACK_ICON_NERD
