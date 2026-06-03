@@ -7,6 +7,14 @@ use crate::format::celsius_to_fahrenheit;
 use crate::graphs::column_chart_panel;
 use crate::warnings;
 
+mod colorize;
+mod icons;
+mod layout;
+
+use self::colorize::{colorize_spark_panel, colorize_temp_panel};
+use self::icons::format_wind_dir_icon;
+use self::layout::render_row;
+
 pub fn render_terminal(
     weather: &Value,
     args: &crate::cli::args::Args,
@@ -360,100 +368,5 @@ pub fn render_terminal(
 
     out
 }
-
-fn render_row(
-    out: &mut String,
-    title1: &str,
-    panel1: &[String],
-    title2: &str,
-    panel2: &[String],
-    title3: &str,
-    panel3: &[String],
-) {
-    let title_field = |t: &str| -> String {
-        // Truncate safely to 24 characters (avoid splitting multi-byte)
-        let t_truncated = if t.chars().count() > 24 {
-            t.chars().take(24).collect()
-        } else {
-            t.to_string()
-        };
-        let pad_left = 6;
-        let graph_w = 24;
-        let total_w = pad_left + graph_w;
-        let title_len = t_truncated.len();
-        let pad = if title_len >= graph_w {
-            0
-        } else {
-            (graph_w - title_len) / 2
-        };
-        let mut field = " ".repeat(pad_left + pad);
-        field.push_str(&t_truncated);
-        let remaining = total_w - field.len();
-        if remaining > 0 {
-            field.push_str(&" ".repeat(remaining));
-        }
-        field
-    };
-
-    out.push_str(&format!(
-        "{}  {}  {}\n",
-        title_field(title1),
-        title_field(title2),
-        title_field(title3)
-    ));
-
-    let max_h = panel1.len().max(panel2.len()).max(panel3.len());
-    for r in 0..max_h {
-        let l1 = panel1
-            .get(r)
-            .map(|s| format!("{:<30}", s))
-            .unwrap_or_else(|| " ".repeat(30));
-        let l2 = panel2
-            .get(r)
-            .map(|s| format!("{:<30}", s))
-            .unwrap_or_else(|| " ".repeat(30));
-        let l3 = panel3
-            .get(r)
-            .map(|s| format!("{:<30}", s))
-            .unwrap_or_else(|| " ".repeat(30));
-        out.push_str(&format!("{}  {}  {}\n", l1, l2, l3));
-    }
-}
-
-fn colorize_temp_panel(rows: &mut [String], temps: &[f64]) {
-    let min_t = temps.iter().cloned().fold(f64::INFINITY, f64::min);
-    let max_t = temps.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-
-    for i in 0..rows.len() {
-        let rev_i = rows.len() - 1 - i;
-        let temp_at_row = if rows.len() <= 1 {
-            25.0
-        } else {
-            min_t + (max_t - min_t) * (rev_i as f64 / (rows.len() - 1) as f64)
-        };
-        rows[i] = color::temp_line(&rows[i], temp_at_row as i64);
-    }
-}
-
-fn colorize_spark_panel(rows: &mut [String], color_fn: fn(&str) -> String) {
-    for row in rows {
-        *row = color_fn(row);
-    }
-}
-
-fn format_wind_dir_icon(degrees: i64) -> &'static str {
-    let dir = ((degrees % 360) as f64 / 45.0).round() as usize % 8;
-    [
-        "\u{2b06}\u{fe0f}",
-        "\u{2197}\u{fe0f}",
-        "\u{27a1}\u{fe0f}",
-        "\u{2198}\u{fe0f}",
-        "\u{2b07}\u{fe0f}",
-        "\u{2199}\u{fe0f}",
-        "\u{2b05}\u{fe0f}",
-        "\u{2196}\u{fe0f}",
-    ][dir]
-}
-
 #[cfg(test)]
 mod tests;
