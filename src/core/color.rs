@@ -1,6 +1,16 @@
-use crate::cli::ColorMode;
+use clap::ValueEnum;
 use std::io::IsTerminal;
 use std::sync::atomic::{AtomicBool, Ordering};
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum ColorMode {
+    #[value(name = "auto")]
+    Auto,
+    #[value(name = "always")]
+    Always,
+    #[value(name = "never")]
+    Never,
+}
 
 static COLOR_ENABLED: AtomicBool = AtomicBool::new(true);
 

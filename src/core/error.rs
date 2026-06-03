@@ -17,6 +17,9 @@ pub enum CuacaError {
     #[error("Configuration error: {0}")]
     Config(String),
 
+    #[error("Data error: {0}")]
+    Data(String),
+
     #[error("Unexpected error: {0}")]
     Unknown(String),
 }

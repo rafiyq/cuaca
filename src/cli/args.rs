@@ -1,5 +1,6 @@
 use clap::{Parser, ValueEnum};
 
+use crate::core::color::ColorMode;
 use crate::lang::Lang;
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -10,16 +11,6 @@ pub enum OutputFormat {
     Text,
     #[value(name = "json")]
     Json,
-}
-
-#[derive(Debug, Clone, Copy, ValueEnum)]
-pub enum ColorMode {
-    #[value(name = "auto")]
-    Auto,
-    #[value(name = "always")]
-    Always,
-    #[value(name = "never")]
-    Never,
 }
 
 #[derive(Parser, Debug)]

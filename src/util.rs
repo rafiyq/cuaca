@@ -6,6 +6,11 @@ pub fn escape_pango(s: &str) -> String {
         .replace('>', "&gt;")
 }
 
+/// Create a Waybar‑compatible JSON error line.
+pub fn error_json(text: &str, tooltip: &str) -> String {
+    serde_json::json!({ "text": text, "tooltip": tooltip }).to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

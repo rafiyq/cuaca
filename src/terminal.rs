@@ -9,7 +9,7 @@ use crate::warnings;
 
 pub fn render_terminal(
     weather: &Value,
-    args: &crate::cli::Args,
+    args: &crate::cli::args::Args,
     warnings: &[warnings::Warning],
 ) -> String {
     let lang = args.lang;
