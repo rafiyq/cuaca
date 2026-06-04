@@ -9,5 +9,6 @@ pub mod format;
 pub mod graphs;
 pub mod l10n;
 pub mod location;
+pub mod location_remote;
 pub mod warnings;
 pub mod weather;

@@ -39,6 +39,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - JSON injection safety in `error_json` using `serde_json::json!`.
 - Release workflow token requirement eliminated (build-only artifacts).
 
+## [0.2.7] - 2026-06-04
+
+### Added
+
+- Remote location resolution via [wilayah Cloudflare Worker](https://api.wilayah.workers.dev) as a replacement for the local `wilayah` SQLite database.
+- Circuit breaker pattern for resilience against remote API outages (5‑minute cooldown after 5 consecutive failures).
+- Unified location resolution cache (`cuaca-resolve.json`) storing both GPS and name lookups with 24 h TTL.
+- Platform‑appropriate persistent cache directories using the `directories` crate (XDG on Linux, Library/Caches on macOS, LOCALAPPDATA on Windows).
+- `WILAYAH_API_BASE` environment variable to customize the remote endpoint (for self‑hosting).
+
+### Changed
+
+- Removed `wilayah` dependency; location lookup now goes over HTTPS.
+- Cache file name changed from `cuaca-gps.json` to `cuaca-resolve.json` (migration not automatic; ephemeral temp cache will be repopulated).
+- Cache directory default changed from system temporary directory to persistent user cache location.
+- Cache now supports both `--lat`/`--lon` and `--name` lookups; each has its own namespace.
+- Updated documentation to reflect new environment variables and privacy considerations.
+
+### Fixed
+
+- Build‑time network download of ~300 MB location database eliminated, simplifying CI and reducing build variability.
+
 ## [0.2.5] - 2026-05-24
 
 ### Added
