@@ -240,6 +240,68 @@ pub fn warning(text: &str) -> String {
     paint(text, "\x1b[38;5;226m") // bright yellow
 }
 
+/// Expand color tokens in a string. Tokens are of the form `{sgr}` where `sgr`
+/// is a semicolon-separated list of SGR parameters (e.g., "38;5;226" or
+/// "38;5;244;1"). When color is disabled, tokens are stripped and plain text
+/// is returned.
+pub fn expand_color_tokens(s: &str) -> String {
+    if !is_color() {
+        // Strip all {...} tokens
+        let mut result = String::new();
+        let mut chars = s.chars();
+        while let Some(c) = chars.next() {
+            if c == '{' {
+                // Skip until '}'
+                for t in chars.by_ref() {
+                    if t == '}' {
+                        break;
+                    }
+                }
+            } else {
+                result.push(c);
+            }
+        }
+        return result;
+    }
+
+    let mut out = String::new();
+    let mut chars = s.chars().peekable();
+    let mut in_color = false;
+
+    while let Some(c) = chars.next() {
+        if c == '{' {
+            // collect token content until '}'
+            let mut content = String::new();
+            for t in chars.by_ref() {
+                if t == '}' {
+                    break;
+                }
+                content.push(t);
+            }
+            // Only expand if content consists of digits and semicolons
+            if content.chars().all(|ch| ch.is_ascii_digit() || ch == ';') {
+                if in_color {
+                    out.push_str("\x1b[0m");
+                }
+                out.push('\x1b');
+                out.push('[');
+                out.push_str(&content);
+                out.push('m');
+                in_color = true;
+            }
+            // else: malformed token, ignore entirely
+        } else {
+            out.push(c);
+        }
+    }
+
+    if in_color {
+        out.push_str("\x1b[0m");
+    }
+
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -280,5 +342,43 @@ mod tests {
         let input = "\x1b[38;2;255;0;0mTrueColor\x1b[0m";
         let output = ansi_to_pango(input);
         assert_eq!(output, "TrueColor");
+    }
+
+    #[test]
+    fn test_expand_color_tokens_single() {
+        let input = "Hello {38;5;226}World";
+        let output = expand_color_tokens(input);
+        assert!(output.starts_with("Hello \x1b[38;5;226m"));
+        assert!(output.contains("World"));
+        assert!(output.ends_with("\x1b[0m"));
+    }
+
+    #[test]
+    fn test_expand_color_tokens_multiple() {
+        let input = "{38;5;226}Red{38;5;244}Blue";
+        let output = expand_color_tokens(input);
+        let mut expected = String::new();
+        expected.push_str("\x1b[38;5;226mRed\x1b[0m\x1b[38;5;244mBlue\x1b[0m");
+        assert_eq!(output, expected);
+    }
+
+    #[test]
+    fn test_expand_color_tokens_plain() {
+        let input = "No tokens here";
+        let output = expand_color_tokens(input);
+        assert_eq!(output, input);
+    }
+
+    #[test]
+    fn test_expand_color_tokens_mixed_invalid() {
+        let input = "A{38;5;226}B{XYZ}C";
+        let output = expand_color_tokens(input);
+        // {XYZ} is invalid and ignored; color remains from previous valid token
+        let mut expected = String::new();
+        expected.push('A');
+        expected.push_str("\x1b[38;5;226m");
+        expected.push_str("BC");
+        expected.push_str("\x1b[0m");
+        assert_eq!(output, expected);
     }
 }

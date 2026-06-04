@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `format_wind_dir_icon` centralized in `format` module, respecting `nerd` flag.
 - Error handling throughout uses `Result` instead of `process::exit`.
 - Warnings fetch now returns `Result<Vec<Warning>, CuacaError>`; callers fall back to empty on error.
-- Color handling separated from ASCII icons (dynamic coloring based on weather code).
+- Color handling for ASCII icons: restored multi‑colored icons via inline token markup (e.g., `{38;5;226}` for sun yellow, `{38;5;33;1}` for rain), processed by `color::expand_color_tokens`.
 - Consistent formatting with `cargo fmt`.
 - Release workflow: macOS runners changed to `macos-latest`; automatic release creation removed (build-only workflow).
 

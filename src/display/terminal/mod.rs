@@ -139,20 +139,20 @@ pub fn render_terminal(
     // Line 1: description
     out.push_str(&format!(
         "     {}   {}\n",
-        color::weather_icon_line(icon[0], first_code),
+        color::expand_color_tokens(icon[0]),
         color::desc_text(desc, first_code),
     ));
     // Line 2: temperature with max in parentheses
     let temp_str = format!("{:+}({}) {}", temp, max_temp, unit);
     out.push_str(&format!(
         "     {}  {}\n",
-        color::weather_icon_line(icon[1], first_code),
+        color::expand_color_tokens(icon[1]),
         temp_str,
     ));
     // Line 3: wind speed (no cardinal)
     out.push_str(&format!(
         "     {}  {} {:.0} {}\n",
-        color::weather_icon_line(icon[2], first_code),
+        color::expand_color_tokens(icon[2]),
         crate::format::format_wind_dir_icon(wd_deg, args.nerd),
         ws as i64,
         lang.wind_unit(),
@@ -160,13 +160,13 @@ pub fn render_terminal(
     // Line 4: visibility (raw vs_text)
     out.push_str(&format!(
         "     {}  {}\n",
-        color::weather_icon_line(icon[3], first_code),
+        color::expand_color_tokens(icon[3]),
         vs_text,
     ));
     // Line 5: precipitation
     out.push_str(&format!(
         "     {}  {:.1} mm\n",
-        color::weather_icon_line(icon[4], first_code),
+        color::expand_color_tokens(icon[4]),
         tp,
     ));
     out.push('\n');

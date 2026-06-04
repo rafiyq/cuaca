@@ -200,7 +200,8 @@ pub fn run(args: Args) -> Result<(), CuacaError> {
     let raw_ascii = get_ascii_icon(weather_code);
     let ascii_lines: Vec<String> = raw_ascii
         .iter()
-        .map(|&line| color::ansi_to_pango(line))
+        .map(|&line| color::expand_color_tokens(line))
+        .map(|ansi_line| color::ansi_to_pango(&ansi_line))
         .collect();
 
     // Prepare detail lines without description
