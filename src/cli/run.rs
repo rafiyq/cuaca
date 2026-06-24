@@ -1,15 +1,11 @@
 //! Orchestration of the application logic.
 
-use super::args::Args;
+use super::args::{Args, OutputFormat};
 use crate::color;
-use crate::constants::{
-    get_ascii_icon, CLOUD_COVER_ICON, ERROR_ICON, PRECIPITATION_ICON, VISIBILITY_ICON,
-};
-use crate::core::cache::cache_dir;
+use crate::constants::{get_ascii_icon, CLOUD_COVER_ICON, PRECIPITATION_ICON, VISIBILITY_ICON};
 use crate::core::error::CuacaError;
 use crate::core::location;
 use crate::core::warnings;
-use crate::core::weather;
 use crate::format::{
     self, format_indicator, format_temp, format_time, format_wind_dir_icon, get_weather_icon,
 };
@@ -17,98 +13,42 @@ use crate::lang::Lang;
 use crate::terminal::render_terminal;
 use crate::util;
 use chrono::{DateTime, Locale, NaiveDateTime, Utc};
-use reqwest::blocking::Client;
-use serde_json::{self, Value};
+use serde_json::Value;
 use std::collections::HashMap;
-use std::fs::metadata;
-use std::fs::read_to_string;
-use std::time::{Duration, SystemTime};
 
-use crate::cli::args::OutputFormat;
-
-/// Main entry point for the CLI application.
-///
-/// Parses arguments, sets color mode, resolves location, fetches weather,
-/// and renders output according to the selected format.
-pub fn run(args: Args) -> Result<(), CuacaError> {
+/// Internal runner that returns the output as a string (for daemon and client).
+/// If `forecast_override` is provided, it bypasses location resolution and weather fetching.
+pub fn run_internal(args: &Args, forecast_override: Option<Value>) -> Result<String, CuacaError> {
     // set color mode
     color::set_color_mode(args.color);
     let lang = args.lang;
 
-    // Resolve location
-    let adm4 = location::resolve(
-        args.adm4.as_deref(),
-        args.lat,
-        args.lon,
-        args.name.as_deref(),
-    )?;
-
-    let mut data = HashMap::new();
-
-    let weather_url = format!(
-        "https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4={}",
-        adm4
-    );
-    let cachefile = cache_dir().join(format!("cuaca-{}.json", adm4));
-
-    let mut iterations = 0;
-    let threshold = 20;
-
-    let is_cache_file_recent = metadata(&cachefile).is_ok_and(|meta| {
-        let ten_minutes_ago = SystemTime::now() - Duration::from_secs(600);
-        meta.modified()
-            .is_ok_and(|mod_time| mod_time > ten_minutes_ago)
-    });
-
-    let client = Client::new();
-    let weather = if is_cache_file_recent {
-        match read_to_string(&cachefile) {
-            Ok(json_str) => match serde_json::from_str::<Value>(&json_str) {
-                Ok(json) => json,
-                Err(_) => {
-                    println!(
-                        "{}",
-                        util::error_json(ERROR_ICON, "corrupted cache, fetching fresh data")
-                    );
-                    weather::fetch_weather(
-                        &client,
-                        &weather_url,
-                        &cachefile,
-                        &mut iterations,
-                        threshold,
-                    )?
-                }
-            },
-            Err(_) => {
-                println!(
-                    "{}",
-                    util::error_json(ERROR_ICON, "cache read error, fetching fresh data")
-                );
-                weather::fetch_weather(
-                    &client,
-                    &weather_url,
-                    &cachefile,
-                    &mut iterations,
-                    threshold,
-                )?
-            }
-        }
+    // Get forecast: either from override or by fetching
+    let weather = if let Some(fc) = forecast_override {
+        fc
     } else {
-        weather::fetch_weather(
-            &client,
-            &weather_url,
-            &cachefile,
-            &mut iterations,
-            threshold,
-        )?
+        // Resolve location
+        let adm4 = location::resolve(
+            args.adm4.as_deref(),
+            args.lat,
+            args.lon,
+            args.name.as_deref(),
+        )?;
+        // Ensure forecast via cache/network (10 min TTL, no archive for direct/client)
+        crate::core::weather::ensure_forecast(&adm4, 600, false)?
     };
+
+    // If raw flag is set, output the raw forecast JSON and exit
+    if args.raw {
+        return Ok(serde_json::to_string_pretty(&weather)?);
+    }
 
     // Parse weather JSON structure
     let lokasi = &weather["lokasi"];
     let cuaca_groups = match weather["data"]
         .as_array()
-        .and_then(|d| d.first())
-        .and_then(|day| day["cuaca"].as_array())
+        .and_then(|data_arr| data_arr.first())
+        .and_then(|day| day.get("cuaca").and_then(|c| c.as_array()))
     {
         Some(groups) => groups,
         None => return Err(CuacaError::Data("invalid BMKG data structure".to_string())),
@@ -150,6 +90,8 @@ pub fn run(args: Args) -> Result<(), CuacaError> {
         temp_c
     };
     let unit = if args.fahrenheit { "°F" } else { "°C" };
+
+    let mut data = HashMap::new();
 
     let mut bar_text = match &args.custom_indicator {
         None => {
@@ -358,7 +300,7 @@ pub fn run(args: Args) -> Result<(), CuacaError> {
     if !warnings_list.is_empty() {
         tooltip += "<b>Weather Warnings:</b>\n";
         for w in &warnings_list {
-            // Validity times: HH:MM–HH:MM (24‑hour, local)
+            // Validity times: HH:MM–HH:MM (24-hour, local)
             let times = if let (Some(e), Some(x)) = (&w.effective, (&w.expires)) {
                 let fmt = |dt: &DateTime<Utc>| dt.format("%H:%M").to_string();
                 format!("Valid: {}–{}\n", fmt(e), fmt(x))
@@ -388,19 +330,24 @@ pub fn run(args: Args) -> Result<(), CuacaError> {
         .unwrap_or_default();
     data.insert("class", css_class);
 
-    match args.format {
+    let output = match args.format {
         OutputFormat::Bar => {
             let json_data = serde_json::json!(data);
-            println!("{}", json_data);
+            serde_json::to_string(&json_data)?
         }
         OutputFormat::Text => {
-            let output = render_terminal(&weather, &args, &warnings_list);
-            println!("{}", output);
+            // For text format, we already have weather as Value
+            render_terminal(&weather, args, &warnings_list)
         }
-        OutputFormat::Json => {
-            println!("{}", serde_json::to_string_pretty(&weather).unwrap());
-        }
-    }
+        OutputFormat::Json => serde_json::to_string_pretty(&weather)?,
+    };
 
+    Ok(output)
+}
+
+/// Public entry point that prints result.
+pub fn run(args: Args) -> Result<(), CuacaError> {
+    let output = run_internal(&args, None)?;
+    println!("{}", output);
     Ok(())
 }

@@ -1,8 +1,9 @@
 use clap::ValueEnum;
+use serde::{Deserialize, Serialize};
 use std::io::IsTerminal;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-#[derive(Debug, Clone, Copy, ValueEnum)]
+#[derive(Debug, Clone, Copy, ValueEnum, Serialize, Deserialize)]
 pub enum ColorMode {
     #[value(name = "auto")]
     Auto,

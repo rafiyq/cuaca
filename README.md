@@ -30,12 +30,75 @@ The installer verifies SHA256 checksums, supports auto‑upgrade, and allows opt
 - `--hide-details` - show shorter per-slot lines (hide cloud cover, precipitation, and visibility)
 - `--warnings` - include BMKG nowcast weather warnings
 - `--warnings-ttl MINUTES` - warnings cache TTL in minutes (default: 15)
+- `--raw` - output raw forecast JSON only (no formatting, no warnings)
 
- Example:
+Example:
 
- ```
- cuaca --adm4 31.71.03.1001 --ampm --hide-details
- ```
+```
+cuaca --adm4 31.71.03.1001 --ampm --hide-details
+```
+
+## Daemon and Client Modes
+
+For long-running deployments (e.g. Waybar), you can run a daemon that listens on a Unix socket and serves requests, reducing API call overhead and rate limit pressure.
+
+Start the daemon:
+
+```
+cuaca server --archive --socket ~/.cache/cuaca/cuaca.sock --ttl 600
+```
+
+This writes a PID file next to the socket and gracefully shuts down on SIGTERM/SIGINT. The `--archive` flag appends every fetched forecast to `forecasts.jsonl` in the cache directory for later analysis.
+
+In your Waybar config, use the client instead of direct calls:
+
+```json
+"custom/weather": {
+    "format": "{}°",
+    "tooltip": true,
+    "interval": 3600,
+    "exec": "cuaca client",
+    "return-type": "json"
+}
+```
+
+If the daemon is not running, the client falls back to a direct fetch.
+
+Environment variables:
+
+- `CUACA_SOCKET` - path to Unix socket (default: `$CUACA_CACHE_DIR/cuaca.sock`).
+
+You can run the daemon as a systemd user service:
+
+```
+[Unit]
+Description=Cuaca weather daemon
+
+[Service]
+ExecStart=%h/.cargo/bin/cuaca server --archive
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+```
+
+Enable with `systemctl --user enable --start cuaca.service`.
+
+## Statistics
+
+The `cuaca stats` command analyzes the archived forecasts (enable with `--archive` on the server) and prints statistical summaries. By default it prints a table with mean and standard deviation for temperature (°C), humidity (%), precipitation (mm), wind (km/h), and cloud cover (%).
+
+Options:
+- `--adm4 FILTER` - only include forecasts for a specific adm4 code.
+- `--start DATE` and `--end DATE` - restrict to date range (YYYY-MM-DD).
+- `--variables VARS` - comma-separated list of variables to include: `t,hu,tp,ws,tcc`. Default is all.
+- `--format table|json` - output format; default is table.
+
+Example:
+
+```
+cuaca stats --start 2026-06-01 --end 2026-06-07 --variables t,hu --format json
+```
 
 ## Weather Warnings
 

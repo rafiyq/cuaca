@@ -1,6 +1,6 @@
 [package]
 name = "cuaca"
-version = "0.2.7"
+version = "0.2.8"
 edition = "2021"
 license = "MIT"
 description = "A weather indicator for Waybar using BMKG weather data"
@@ -16,6 +16,9 @@ serde_json = "1.0.149"
 quick-xml = { version = "0.31", features = ["serialize"] }
 thiserror = "1"
 directories = "5"
+
+[target.'cfg(unix)'.dependencies]
+signal-hook = "0.3"
 
 [dev-dependencies]
 mockito = "1.0"

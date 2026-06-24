@@ -21,6 +21,7 @@ fn default_args() -> Args {
         warnings_ttl: 15,
         yticks: 4,
         color: ColorMode::Never,
+        raw: false,
     }
 }
 

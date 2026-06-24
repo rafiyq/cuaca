@@ -2,7 +2,12 @@ pub mod cli;
 pub mod display;
 pub mod util;
 
+#[cfg(unix)]
+pub mod client;
 pub mod core;
+#[cfg(unix)]
+pub mod server;
+pub mod stats;
 
 pub use core::cache;
 pub use core::color;

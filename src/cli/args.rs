@@ -1,11 +1,12 @@
 //! CLI arguments definition.
 
-use clap::{Parser, ValueEnum};
+use clap::{Parser, Subcommand, ValueEnum};
+use serde::{Deserialize, Serialize};
 
 use crate::core::color::ColorMode;
 use crate::lang::Lang;
 
-#[derive(Debug, Clone, Copy, ValueEnum)]
+#[derive(Debug, Clone, Copy, ValueEnum, Serialize, Deserialize)]
 pub enum OutputFormat {
     #[value(name = "bar")]
     Bar,
@@ -15,14 +16,8 @@ pub enum OutputFormat {
     Json,
 }
 
-/// Command-line arguments parsed by clap.
-#[derive(Parser, Debug)]
-#[command(
-    name = "cuaca",
-    version,
-    about = "A weather indicator using BMKG data",
-    long_about = None
-)]
+/// Direct mode arguments (also used as client request payload).
+#[derive(Parser, Debug, Clone, Serialize, Deserialize)]
 pub struct Args {
     #[arg(
         long,
@@ -109,4 +104,94 @@ pub struct Args {
         help = "ANSI color output: auto, always, or never"
     )]
     pub color: ColorMode,
+
+    #[arg(
+        long,
+        help = "Output raw forecast JSON instead of formatted Waybar output (client and direct modes only)"
+    )]
+    pub raw: bool,
+}
+
+/// Server subcommand options.
+#[derive(Parser, Debug, Clone)]
+pub struct ServerOpts {
+    #[arg(
+        long,
+        help = "Enable archiving of forecasts to forecasts.jsonl for later analytics"
+    )]
+    pub archive: bool,
+
+    #[arg(
+        long,
+        help = "Path to Unix socket for client connections (overrides CUACA_SOCKET and default)"
+    )]
+    pub socket: Option<std::path::PathBuf>,
+
+    #[arg(
+        long,
+        default_value = "10",
+        help = "Cache TTL in minutes for forecasts (default: 10)"
+    )]
+    pub ttl: Option<u64>,
+}
+
+/// Stats subcommand options.
+#[derive(Parser, Debug, Clone)]
+pub struct StatsOpts {
+    #[arg(long, help = "Filter by adm4 code (default: all)")]
+    pub adm4: Option<String>,
+
+    #[arg(long, help = "Start date for forecast slots (YYYY-MM-DD, local time)")]
+    pub start: Option<chrono::NaiveDate>,
+
+    #[arg(long, help = "End date for forecast slots (YYYY-MM-DD, local time)")]
+    pub end: Option<chrono::NaiveDate>,
+
+    #[arg(
+        long,
+        default_value = "t,hu,tp,ws,tcc",
+        help = "Comma-separated list of variables to include in statistics"
+    )]
+    pub variables: String,
+
+    #[arg(
+        long,
+        value_enum,
+        default_value = "table",
+        help = "Output format: table or json"
+    )]
+    pub format: Option<OutputFormat>,
+}
+
+/// Top-level command enumeration.
+#[derive(Subcommand, Debug, Clone)]
+pub enum Command {
+    /// Start the cuaca server daemon (Unix only)
+    Server(ServerOpts),
+
+    /// Query the server (fallback to direct if unavailable)
+    Client {
+        #[arg(long, help = "Output raw forecast JSON instead of Waybar format")]
+        raw: bool,
+    },
+
+    /// Analyze forecast archive for volatility and consistency
+    Stats(StatsOpts),
+}
+
+/// Root command with optional subcommand.
+#[derive(Parser, Debug)]
+pub struct Root {
+    #[command(flatten)]
+    pub args: Args,
+
+    #[command(subcommand)]
+    pub cmd: Option<Command>,
+}
+
+// Helper to convert Args into the request for client (cloning is fine)
+impl From<&Args> for serde_json::Value {
+    fn from(args: &Args) -> Self {
+        serde_json::to_value(args).unwrap()
+    }
 }

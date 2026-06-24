@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.8] - 2026-06-06
+
+### Added
+
+- Daemon/server mode (`cuaca server`) that listens on a Unix socket, serves forecast requests, and optionally archives raw forecasts to a JSONL file.
+- Client mode (`cuaca client`) that queries the daemon with fallback to direct fetch if daemon unavailable; supports `--raw` for raw JSON output.
+- Stats subcommand (`cuaca stats`) that reads the archive and computes volatility (mean, standard deviation) of forecast variables grouped by date and hour.
+- Unified cache wrapper format (`fetched_at`, `adm4`, `forecast`) for both active cache and archive.
+- Serde derives for `Lang` and `ColorMode` to enable serialization over the wire.
+
+### Changed
+
+- Active cache now includes `fetched_at` for TTL checking; backward compatible with old cache (triggers refetch).
+- Direct mode (no subcommand) now supports `--raw` flag.
+- CLI refactored into subcommands with mutually exclusive behavior.
+- Cache directory uses `directories` crate (continued from v0.2.7).
+- Archive enabled via `--archive` flag on server.
+
 ## [0.2.6] - 2026-06-03
 
 ### Added

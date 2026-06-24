@@ -1,6 +1,7 @@
 use clap::ValueEnum;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, ValueEnum)]
+#[derive(Debug, Clone, Copy, ValueEnum, Serialize, Deserialize)]
 pub enum Lang {
     #[value(name = "en")]
     EN,
