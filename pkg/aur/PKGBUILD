@@ -1,0 +1,24 @@
+# Maintainer: Rafiyq <rafiyq@outlook.com>
+# Draft: publish with `git clone ssh://aur@aur.archlinux.org/cuaca.git`, copy
+# this file into it, and push. Bump pkgver + pkgrel (reset pkgrel) on every
+# upstream release; refresh sha256sums from the release's .sha256 asset.
+
+pkgname=cuaca
+pkgver=0.4.0
+pkgrel=1
+pkgdesc="A weather indicator for Waybar using BMKG weather data"
+arch=('x86_64' 'aarch64')
+url="https://github.com/rafiyq/cuaca"
+license=('MIT')
+provides=("${pkgname}-${pkgver}")
+conflicts=("${pkgname}-git" "${pkgname}-bin")
+source_x86_64=("cuaca-v${pkgver}-x86_64-linux.tar.gz::${url}/releases/download/v${pkgver}/cuaca-v${pkgver}-x86_64-linux.tar.gz")
+source_aarch64=("cuaca-v${pkgver}-aarch64-linux.tar.gz::${url}/releases/download/v${pkgver}/cuaca-v${pkgver}-aarch64-linux.tar.gz")
+sha256sums_x86_64=('08e3e58a75d2d5a8d75da8a138d8b672839f793206a3ce45273ac680a36883a6')
+sha256sums_aarch64=('8f9160d9558093d7816d93be4d4a7351d1bf7ec1d68d77a5c291d74511ed2e67')
+
+package() {
+    install -Dm755 "${srcdir}/cuaca" "${pkgdir}/usr/bin/cuaca"
+    install -Dm644 "${srcdir}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+    install -Dm644 "${srcdir}/README.md" "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+}

@@ -1,5 +1,10 @@
 # cuaca
 
+[![CI](https://github.com/rafiyq/cuaca/actions/workflows/test.yaml/badge.svg?branch=main)](https://github.com/rafiyq/cuaca/actions/workflows/test.yaml)
+[![Release](https://github.com/rafiyq/cuaca/actions/workflows/release.yaml/badge.svg)](https://github.com/rafiyq/cuaca/releases)
+[![Latest release](https://img.shields.io/github/v/release/rafiyq/cuaca)](https://github.com/rafiyq/cuaca/releases/latest)
+[![License: MIT](https://img.shields.io/crates/l/MIT)](https://github.com/rafiyq/cuaca/blob/main/LICENSE)
+
 a weather indicator for [Waybar](https://github.com/Alexays/Waybar/) using [BMKG](https://www.bmkg.go.id/) weather data.
 
 > Since v0.4.0 this repo is the **CLI/daemon layer** of the cuaca toolchain. Typed forecast models, EN/ID localization, icons, and all rendering (Waybar + terminal) live in the [`cuaca`](https://crates.io/crates/cuaca) library (v1.0). This crate (`cuaca-cli`) builds the `cuaca` binary on top of it and owns the I/O: fetching, caching, location resolution, RFC/CAP warnings, the daemon socket, and stats plumbing.
