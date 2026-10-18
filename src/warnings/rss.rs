@@ -1,4 +1,4 @@
-use crate::core::error::CuacaError;
+use crate::error::CuacaError;
 use quick_xml::de::Deserializer;
 use serde::Deserialize;
 

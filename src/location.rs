@@ -1,6 +1,6 @@
 use super::location_remote;
-use crate::core::cache::cache_dir;
-use crate::core::error::CuacaError;
+use crate::cache::cache_dir;
+use crate::error::CuacaError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{self, create_dir_all};
@@ -142,7 +142,7 @@ pub fn resolve(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::location_remote::reset_breaker;
+    use crate::location_remote::reset_breaker;
     use serial_test::serial;
     use std::env;
     use tempfile::TempDir;
@@ -213,7 +213,7 @@ mod tests {
             .create();
 
         reset_breaker();
-        env::set_var("WILAYAH_API_BASE", &server.url());
+        env::set_var("WILAYAH_API_BASE", server.url());
         let result = resolve(None, Some(10.0), Some(110.0), None);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "33.12.34.2002");
@@ -233,7 +233,7 @@ mod tests {
             .create();
 
         reset_breaker();
-        env::set_var("WILAYAH_API_BASE", &server.url());
+        env::set_var("WILAYAH_API_BASE", server.url());
         let result = resolve(None, None, None, Some("kemayoran"));
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "31.71.03.1001");

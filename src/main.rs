@@ -1,9 +1,7 @@
 use clap::Parser;
-use cuaca::cli::args::{Command, Root};
-use cuaca::client;
-use cuaca::server;
-use cuaca::stats;
 use cuaca::util::error_json;
+use cuaca_cli::cli::args::{Command, Root};
+use cuaca_cli::{client, server, stats};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let root = Root::parse();
@@ -11,7 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match root.cmd {
         None => {
             // Direct mode
-            if let Err(e) = cuaca::cli::run::run(root.args) {
+            if let Err(e) = cuaca_cli::cli::run::run(root.args) {
                 println!("{}", error_json("⛔️", &e.to_string()));
                 std::process::exit(1);
             }

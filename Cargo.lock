@@ -269,10 +269,23 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
 name = "cuaca"
-version = "0.2.8"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa8a7f3b26d0f130130588c7946ae879d08d601f445d8e0218c3e24a0a61b59e"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "cuaca-cli"
+version = "0.4.0"
 dependencies = [
  "chrono",
  "clap",
+ "cuaca",
  "directories",
  "mockito",
  "quick-xml",

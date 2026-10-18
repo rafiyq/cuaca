@@ -2,12 +2,11 @@ use super::cache::{
     alert_cache_path, rss_cache_path, warnings_cache_dir, ItemCacheEntry, RssCache,
 };
 use super::cap::parse_cap;
-use super::polygon::{parse_polygon, point_in_polygon};
 use super::rss::parse_rss;
 use super::Warning;
-use crate::core::error::CuacaError;
-use crate::lang::Lang;
+use crate::error::CuacaError;
 use chrono::{DateTime, Duration, Utc};
+use cuaca::Lang;
 use reqwest::blocking::Client;
 use serde_json;
 use std::fs;
@@ -34,35 +33,16 @@ fn parse_iso(s: &str) -> Option<DateTime<Utc>> {
         .map(|dt| dt.with_timezone(&Utc))
 }
 
-#[allow(dead_code)]
-fn filter_by_province(
-    mut alerts: Vec<Warning>,
-    province: &str,
-) -> Result<Vec<Warning>, CuacaError> {
-    let province_lower = province.to_ascii_lowercase();
-    alerts.retain(|w| w.area_desc.to_ascii_lowercase().contains(&province_lower));
-    let now = Utc::now();
-    alerts.retain(|w| {
-        let eff = w.effective.unwrap_or(now);
-        let exp = w.expires.unwrap_or(now + Duration::days(1));
-        now >= eff && now < exp
-    });
-    Ok(alerts)
-}
-
-/// Fetch active weather warnings for a province, optionally filtered by location.
+/// Fetch BMKG weather warnings (nowcasts).
 ///
-/// Uses RSS feed and CAP alerts with caching. Returns a list of warnings.
+/// Uses the RSS feed and CAP alerts with two-level caching. Returns all
+/// parsed alerts; relevance filtering (polygon containment with province
+/// name + validity-time fallback) is done by the caller via
+/// `cuaca::warnings::select_relevant`.
 /// Errors are propagated as `CuacaError`.
 ///
 /// Note: Callers typically use `unwrap_or_default` to fall back to an empty list on error.
-pub fn fetch_warnings(
-    province: &str,
-    lang: Lang,
-    lat: f64,
-    lon: f64,
-    ttl_minutes: u64,
-) -> Result<Vec<Warning>, CuacaError> {
+pub fn fetch_warnings(lang: Lang, ttl_minutes: u64) -> Result<Vec<Warning>, CuacaError> {
     // Ensure cache directory exists
     let warn_dir = warnings_cache_dir();
     let _ = fs::create_dir_all(&warn_dir);
@@ -90,8 +70,8 @@ pub fn fetch_warnings(
     } else {
         // Fresh fetch
         let rss_url = match lang {
-            crate::lang::Lang::EN => "https://www.bmkg.go.id/alerts/nowcast/en",
-            crate::lang::Lang::ID => "https://www.bmkg.go.id/alerts/nowcast/id",
+            cuaca::Lang::EN => "https://www.bmkg.go.id/alerts/nowcast/en",
+            cuaca::Lang::ID => "https://www.bmkg.go.id/alerts/nowcast/id",
         };
         let client = Client::new();
         let rss_resp = client.get(rss_url).send()?;
@@ -168,7 +148,7 @@ pub fn fetch_warnings(
         let expires = parse_iso(&info.expires);
         let mut polygons = Vec::new();
         for p in info.area.polygons {
-            let pts = parse_polygon(&p);
+            let pts = cuaca::warnings::parse_polygon(&p);
             if !pts.is_empty() {
                 polygons.push(pts);
             }
@@ -188,27 +168,5 @@ pub fn fetch_warnings(
         alerts.push(warning);
     }
 
-    // Polygon-based filtering with fallback to area name and time validity
-    let point = (lat, lon);
-    let mut filtered: Vec<Warning> = alerts
-        .iter()
-        .filter(|w| {
-            !w.polygons.is_empty() && w.polygons.iter().any(|poly| point_in_polygon(point, poly))
-        })
-        .cloned()
-        .collect();
-
-    if filtered.is_empty() {
-        filtered = alerts.clone();
-        let province_lower = province.to_ascii_lowercase();
-        filtered.retain(|w| w.area_desc.to_ascii_lowercase().contains(&province_lower));
-        let now = Utc::now();
-        filtered.retain(|w| {
-            let eff = w.effective.unwrap_or(now);
-            let exp = w.expires.unwrap_or(now + Duration::days(1));
-            now >= eff && now < exp
-        });
-    }
-
-    Ok(filtered)
+    Ok(alerts)
 }

@@ -1,14 +1,23 @@
 [package]
-name = "cuaca"
-version = "0.3.0"
+name = "cuaca-cli"
+version = "0.4.0"
 edition = "2021"
 license = "MIT"
 description = "A weather indicator for Waybar using BMKG weather data"
 repository = "https://github.com/rafiyq/cuaca"
 homepage = "https://github.com/rafiyq/cuaca"
 
+[[bin]]
+name = "cuaca"
+path = "src/main.rs"
+
+[lib]
+name = "cuaca_cli"
+path = "src/lib.rs"
+
 [dependencies]
-chrono = { version = "0.4.44", features = ["unstable-locales", "serde"] }
+cuaca = "1.0"
+chrono = { version = "0.4.44", features = ["serde"] }
 clap = { version = "4.6.1", features = ["derive"] }
 reqwest = { version = "0.13.3", default-features = false, features = ["blocking", "json", "rustls"] }
 serde = { version = "1", features = ["derive"] }

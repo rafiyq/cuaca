@@ -21,8 +21,10 @@ pub fn cache_dir() -> PathBuf {
 mod tests {
     use super::*;
     use directories::ProjectDirs;
+    use serial_test::serial;
 
     #[test]
+    #[serial]
     fn test_cache_dir() {
         // Save previous state
         let prev = env::var("CUACA_CACHE_DIR").ok();

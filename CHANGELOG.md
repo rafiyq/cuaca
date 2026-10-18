@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-10-18
+
+### Changed
+
+- **Library split:** this repo now builds only the `cuaca` binary (package name `cuaca-cli`). Typed BMKG models, EN/ID localization, icons, ASCII art graphs, Pango color handling, and the Waybar + terminal renderers moved to the published [`cuaca` 1.0.0](https://crates.io/crates/cuaca) library ([source](https://github.com/rafiyq/cuaca-rs)).
+- Warnings relevance filtering is delegated to `cuaca::warnings::select_relevant`; `fetch_warnings` now only fetches/parses/caches RSS + CAP alerts.
+- Stats are computed with `cuaca::stats::summarize` (identical table and JSON layout, including the `Lead(h)` column).
+- Daemon wire format now serializes the new `Args` shape; older daemon/client pairs are incompatible and should be upgraded together.
+
+### Fixed
+
+- Wind-direction icon for negative degrees now wraps correctly (e.g. -45° is NW, provided by the library's `format_wind_dir_icon` fix).
+
+### Kept-compatible
+
+- BMKG forecast cache files (`cuaca-{adm4}.json`) and the `forecasts.jsonl` archive keep the same wrapper shape; existing caches and stats history still work.
+- CLI flags, daemon socket/PID behavior, and client fallback semantics unchanged.
+
 ## [0.3.0] - 2026-06-24
 
 ### Added

@@ -22,6 +22,9 @@ pub enum CuacaError {
 
     #[error("Unexpected error: {0}")]
     Unknown(String),
+
+    #[error(transparent)]
+    Lib(#[from] cuaca::CuacaError),
 }
 
 impl From<serde_json::Error> for CuacaError {
@@ -30,5 +33,4 @@ impl From<serde_json::Error> for CuacaError {
     }
 }
 
-// For warnings fetch failures, we may want a separate type or alias.
 pub type WarningResult<T> = Result<T, CuacaError>;

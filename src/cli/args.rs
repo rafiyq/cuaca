@@ -1,19 +1,40 @@
 //! CLI arguments definition.
 
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 
-use crate::core::color::ColorMode;
-use crate::lang::Lang;
+pub use cuaca::{ColorMode, Lang, OutputFormat};
 
-#[derive(Debug, Clone, Copy, ValueEnum, Serialize, Deserialize)]
-pub enum OutputFormat {
-    #[value(name = "bar")]
-    Bar,
-    #[value(name = "text")]
-    Text,
-    #[value(name = "json")]
-    Json,
+fn parse_output_format(s: &str) -> Result<OutputFormat, String> {
+    match s.to_ascii_lowercase().as_str() {
+        "bar" => Ok(OutputFormat::Bar),
+        "text" => Ok(OutputFormat::Text),
+        "json" => Ok(OutputFormat::Json),
+        other => Err(format!(
+            "invalid format '{}': expected bar, text, or json",
+            other
+        )),
+    }
+}
+
+fn parse_lang(s: &str) -> Result<Lang, String> {
+    match s.to_ascii_lowercase().as_str() {
+        "en" => Ok(Lang::EN),
+        "id" => Ok(Lang::ID),
+        other => Err(format!("invalid language '{}': expected en or id", other)),
+    }
+}
+
+fn parse_color_mode(s: &str) -> Result<ColorMode, String> {
+    match s.to_ascii_lowercase().as_str() {
+        "auto" => Ok(ColorMode::Auto),
+        "always" => Ok(ColorMode::Always),
+        "never" => Ok(ColorMode::Never),
+        other => Err(format!(
+            "invalid color mode '{}': expected auto, always, or never",
+            other
+        )),
+    }
 }
 
 /// Direct mode arguments (also used as client request payload).
@@ -35,7 +56,7 @@ pub struct Args {
     pub name: Option<String>,
 
     #[arg(
-        value_enum,
+        value_parser = parse_lang,
         short,
         long,
         default_value = "en",
@@ -44,7 +65,7 @@ pub struct Args {
     pub lang: Lang,
 
     #[arg(
-        value_enum,
+        value_parser = parse_output_format,
         long,
         default_value = "bar",
         help = "Output format: bar (Waybar JSON), text (terminal display), json (raw data)"
@@ -98,7 +119,7 @@ pub struct Args {
     pub yticks: usize,
 
     #[arg(
-        value_enum,
+        value_parser = parse_color_mode,
         long,
         default_value = "auto",
         help = "ANSI color output: auto, always, or never"
@@ -110,6 +131,23 @@ pub struct Args {
         help = "Output raw forecast JSON instead of formatted Waybar output (client and direct modes only)"
     )]
     pub raw: bool,
+}
+
+impl From<&Args> for cuaca::Config {
+    fn from(args: &Args) -> Self {
+        cuaca::Config {
+            lang: args.lang,
+            format: args.format,
+            custom_indicator: args.custom_indicator.clone(),
+            date_format: args.date_format.clone(),
+            ampm: args.ampm,
+            nerd: args.nerd,
+            hide_details: args.hide_details,
+            fahrenheit: args.fahrenheit,
+            yticks: args.yticks,
+            color: args.color,
+        }
+    }
 }
 
 /// Server subcommand options.
@@ -156,9 +194,8 @@ pub struct StatsOpts {
 
     #[arg(
         long,
-        value_enum,
-        default_value = "table",
-        help = "Output format: table or json"
+        value_parser = parse_output_format,
+        help = "Output format: table (default) or json"
     )]
     pub format: Option<OutputFormat>,
 }
@@ -189,7 +226,7 @@ pub struct Root {
     pub cmd: Option<Command>,
 }
 
-// Helper to convert Args into the request for client (cloning is fine)
+/// Helper: serialize args for the client->server wire protocol.
 impl From<&Args> for serde_json::Value {
     fn from(args: &Args) -> Self {
         serde_json::to_value(args).unwrap()

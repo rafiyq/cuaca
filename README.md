@@ -2,6 +2,8 @@
 
 a weather indicator for [Waybar](https://github.com/Alexays/Waybar/) using [BMKG](https://www.bmkg.go.id/) weather data.
 
+> Since v0.4.0 this repo is the **CLI/daemon layer** of the cuaca toolchain. Typed forecast models, EN/ID localization, icons, and all rendering (Waybar + terminal) live in the [`cuaca`](https://crates.io/crates/cuaca) library (v1.0). This crate (`cuaca-cli`) builds the `cuaca` binary on top of it and owns the I/O: fetching, caching, location resolution, RFC/CAP warnings, the daemon socket, and stats plumbing.
+
 ## Installation
 
 1. Compile yourself using `cargo build --release`, or

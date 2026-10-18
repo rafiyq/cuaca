@@ -1,7 +1,7 @@
 use crate::cli::args::Args;
 use crate::cli::run::run_internal;
-use crate::core::error::CuacaError;
-use crate::core::weather::ensure_forecast;
+use crate::error::CuacaError;
+use crate::weather::ensure_forecast;
 use serde_json;
 use std::env;
 use std::io::{BufRead, BufWriter, Write};
@@ -31,7 +31,7 @@ struct Daemon {
 #[cfg(unix)]
 impl Daemon {
     fn start(socket: Option<PathBuf>, archive: bool, ttl_secs: u64) -> Result<(), CuacaError> {
-        let cache_dir = crate::core::cache::cache_dir();
+        let cache_dir = crate::cache::cache_dir();
         let socket_path = socket.unwrap_or_else(|| {
             env::var("CUACA_SOCKET")
                 .map(PathBuf::from)
@@ -74,7 +74,9 @@ impl Daemon {
                 Ok((stream, _addr)) => {
                     let daemon = daemon.clone();
                     thread::spawn(move || {
-                        let _ = daemon.handle_connection(stream);
+                        if let Err(e) = daemon.handle_connection(stream) {
+                            eprintln!("connection error: {}", e);
+                        }
                     });
                 }
                 Err(e) => {
@@ -103,7 +105,7 @@ impl Daemon {
         let request: Args = serde_json::from_str(line.trim())?;
 
         // Resolve location
-        let adm4 = crate::core::location::resolve(
+        let adm4 = crate::location::resolve(
             request.adm4.as_deref(),
             request.lat,
             request.lon,

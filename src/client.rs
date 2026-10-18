@@ -11,7 +11,7 @@ fn send_request_unix(args: &Args, raw: bool) -> Result<(), Box<dyn Error>> {
 
     // Determine socket path
     let socket_path = env::var("CUACA_SOCKET").unwrap_or_else(|_| {
-        let cache_dir = crate::core::cache::cache_dir();
+        let cache_dir = crate::cache::cache_dir();
         cache_dir.join("cuaca.sock").to_string_lossy().into_owned()
     });
 

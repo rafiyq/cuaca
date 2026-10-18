@@ -1,4 +1,4 @@
-use crate::core::error::CuacaError;
+use crate::error::CuacaError;
 use chrono::{DateTime, Utc};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
@@ -74,7 +74,7 @@ fn maybe_archive(wrapper: &CacheWrapper, archive: bool) -> Result<(), CuacaError
     if !archive {
         return Ok(());
     }
-    let cache_dir = crate::core::cache::cache_dir();
+    let cache_dir = crate::cache::cache_dir();
     let archive_path = cache_dir.join("forecasts.jsonl");
     if let Some(parent) = archive_path.parent() {
         fs::create_dir_all(parent)?;
@@ -91,7 +91,7 @@ fn maybe_archive(wrapper: &CacheWrapper, archive: bool) -> Result<(), CuacaError
 /// Ensure we have a fresh forecast for the given adm4.
 /// Returns the forecast JSON (Value). Will fetch from BMKG if cache missing or stale.
 pub fn ensure_forecast(adm4: &str, ttl_secs: u64, archive: bool) -> Result<Value, CuacaError> {
-    let cache_dir = crate::core::cache::cache_dir();
+    let cache_dir = crate::cache::cache_dir();
     let cachefile = cache_dir.join(format!("cuaca-{}.json", adm4));
 
     // Try load cache
@@ -129,10 +129,12 @@ pub fn ensure_forecast(adm4: &str, ttl_secs: u64, archive: bool) -> Result<Value
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::cache::cache_dir;
+    use crate::cache::cache_dir;
+    use serial_test::serial;
     use std::fs;
 
     #[test]
+    #[serial]
     fn test_cache_wrapper_serialize_deserialize() {
         let wrapper = CacheWrapper {
             fetched_at: "2025-06-06T00:00:00Z".to_string(),
@@ -147,6 +149,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_load_wrapper_missing() {
         let cache_dir = cache_dir();
         let path = cache_dir.join("nonexistent_cache.json");
@@ -155,6 +158,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_save_and_load_wrapper() {
         let cache_dir = cache_dir();
         let path = cache_dir.join("test_cache_weather.json");

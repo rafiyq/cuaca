@@ -1,4 +1,4 @@
-use crate::core::error::CuacaError;
+use crate::error::CuacaError;
 use reqwest::blocking::Client;
 use std::env;
 use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
@@ -254,7 +254,7 @@ mod tests {
             .with_body(r#"{"results":[{"code":"31.71.03.1001"}]}"#)
             .create();
 
-        std::env::set_var("WILAYAH_API_BASE", &server.url());
+        std::env::set_var("WILAYAH_API_BASE", server.url());
         let result = fetch_nearest(-6.1647, 106.8453);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "31.71.03.1001");
@@ -273,7 +273,7 @@ mod tests {
             .with_body(r#"{"results":[]}"#)
             .create();
 
-        std::env::set_var("WILAYAH_API_BASE", &server.url());
+        std::env::set_var("WILAYAH_API_BASE", server.url());
         let result = fetch_nearest(1.23, 4.56);
         assert!(result.is_err());
         mock.assert();
@@ -291,7 +291,7 @@ mod tests {
             .with_body(r#"{"results":[{"code":"31.71.03.1001"}]}"#)
             .create();
 
-        std::env::set_var("WILAYAH_API_BASE", &server.url());
+        std::env::set_var("WILAYAH_API_BASE", server.url());
         let result = fetch_search("kemayoran");
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "31.71.03.1001");
