@@ -218,6 +218,7 @@ pub enum Command {
 
 /// Root command with optional subcommand.
 #[derive(Parser, Debug)]
+#[command(name = "cuaca", version)]
 pub struct Root {
     #[command(flatten)]
     pub args: Args,
